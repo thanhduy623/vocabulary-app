@@ -6,6 +6,9 @@ import {
   activateNextPendingSkill,
   getCurrentItem,
   submitAnswer,
+  skipToNextItem,
+  backToPreviousItem,
+  getProgress,
 } from '@/engine'
 import { SKILL_IDS } from '@/engine/core/constants'
 import { freshWords } from './helpers'
@@ -107,5 +110,73 @@ describe('skill lifecycle', () => {
 
     activateNextPendingSkill(session)
     expect(findPendingSkill(session)).toBeNull()
+  })
+})
+
+describe('queue browsing (flash-card Tiếp theo / Lùi lại)', () => {
+  function setup() {
+    const session = createLearningSession({
+      words: freshWords(),
+      skillIds: [FLASH_CARD],
+      seed: 20,
+    })
+    beginSkill(session, FLASH_CARD)
+    return session
+  }
+
+  it('skipToNextItem rotates the head to the tail without touching counters', () => {
+    const session = setup()
+    const plan = session.skills[FLASH_CARD]
+    const firstId = getCurrentItem(session, FLASH_CARD).id
+    const before = getProgress(session, FLASH_CARD)
+
+    const next = skipToNextItem(session, FLASH_CARD)
+
+    expect(next.id).not.toBe(firstId) // moved on…
+    expect(getCurrentItem(session, FLASH_CARD).id).toBe(next.id)
+    // …but nothing resolved: the first card is still queued at the tail.
+    expect(plan.queue.some((i) => i.id === firstId)).toBe(true)
+
+    const after = getProgress(session, FLASH_CARD)
+    expect(after.completed).toBe(before.completed)
+    expect(after.correct).toBe(before.correct)
+    expect(after.incorrect).toBe(before.incorrect)
+    expect(after.remaining).toBe(before.remaining)
+  })
+
+  it('backToPreviousItem rotates the tail back to the head', () => {
+    const session = setup()
+    skipToNextItem(session, FLASH_CARD) // A → B (A at tail)
+    const currentBeforeBack = getCurrentItem(session, FLASH_CARD).id
+
+    const prev = backToPreviousItem(session, FLASH_CARD)
+    const nowCurrent = getCurrentItem(session, FLASH_CARD).id
+
+    expect(prev.id).toBe(nowCurrent)
+    expect(nowCurrent).not.toBe(currentBeforeBack)
+    // full membership preserved
+    expect(session.skills[FLASH_CARD].queue.length).toBe(
+      session.skills[FLASH_CARD].total,
+    )
+  })
+
+  it('is a no-op when only one item remains', () => {
+    const session = createLearningSession({
+      words: freshWords().slice(0, 1),
+      skillIds: [FLASH_CARD],
+      seed: 21,
+    })
+    // one word with all fields present → exactly 3 cards, drain two of them
+    beginSkill(session, FLASH_CARD)
+    submitAnswer(session, FLASH_CARD, { value: 'remembered' })
+    submitAnswer(session, FLASH_CARD, { value: 'remembered' })
+
+    const only = getCurrentItem(session, FLASH_CARD)
+    const next = skipToNextItem(session, FLASH_CARD)
+    const prev = backToPreviousItem(session, FLASH_CARD)
+
+    expect(next.id).toBe(only.id)
+    expect(prev.id).toBe(only.id)
+    expect(getProgress(session, FLASH_CARD).remaining).toBe(1)
   })
 })

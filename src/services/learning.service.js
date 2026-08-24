@@ -1,54 +1,31 @@
 // Learning service (docs/architecture.md §2/§5, learning-engine.md §8).
-// Coordinates selection state → engine session snapshots.
-// SKELETON: contract only; engine wiring arrives in Phase 4.
+//
+// Pure orchestrator between the engine and the learning store: builds the
+// session snapshot. It does NOT import any Pinia store — the store applies
+// the results to its state (same pattern as collections.service).
 
-import { useLearningStore } from '@/stores/learningStore'
-import { useWordsStore } from '@/stores/wordsStore'
-import { MIN_WORDS_TO_STUDY, MIN_SKILLS_TO_START } from '@/stores/learningStore'
+import { createLearningSession, activateNextPendingSkill } from '@/engine'
 
 /**
- * Start a learning session for the current selection.
- * TODO(Phase 4): call the engine's LearningSession.startSession(...) and
- * store the snapshot in learningStore.learningSession.
+ * Create a learning session snapshot from the learner's selection and
+ * activate the first selected skill.
  *
- * @returns {Promise<{ok: true}|{ok: false, reason: string}>}
+ * @param {{
+ *   collectionId: string,
+ *   words: Object[],       // snapshot copies of the selected words
+ *   skillIds: string[],    // learner-chosen order (BR-33)
+ *   lang?: string,         // collection.symbol → TTS pronunciation
+ * }} params
+ * @returns {{ session: Object, firstSkillId: string|null }}
+ * @throws when words/skillIds are invalid or a skill id is unknown
  */
-export async function startLearningSession() {
-  const learningStore = useLearningStore()
-  const wordsStore = useWordsStore()
-
-  const collectionId = learningStore.selectedCollectionId
-  if (!collectionId) return { ok: false, reason: 'No collection selected' }
-  if (learningStore.selectedWordIds.length < MIN_WORDS_TO_STUDY) {
-    return { ok: false, reason: `Select at least ${MIN_WORDS_TO_STUDY} words` }
-  }
-  if (learningStore.selectedSkillIds.length < MIN_SKILLS_TO_START) {
-    return { ok: false, reason: 'Select at least one skill' }
-  }
-
-  // Words snapshot from cache (independent copy per docs).
-  const words = wordsStore
-    .wordsOf(collectionId)
-    .filter((w) => learningStore.selectedWordIds.includes(w.id))
-    .map((w) => ({ ...w }))
-
-  // TODO(Phase 4):
-  //   const snapshot = LearningSession.startSession({
-  //     collectionId, wordIds: selectedWordIds, skillIds: selectedSkillIds,
-  //     words, seed: Date.now(),
-  //   })
-  //   learningStore.learningSession = snapshot
-  //   learningStore.setActiveSkill(snapshot.selectedSkillOrder[0])
-
-  void words
-  return { ok: true }
-}
-
-/**
- * Exit the active skill (BR-70): only that skill's progress is discarded.
- * @returns {void}
- */
-export function exitSkill() {
-  const learningStore = useLearningStore()
-  learningStore.exitSkill()
+export function createSession({ collectionId, words, skillIds, lang = '' }) {
+  const session = createLearningSession({
+    collectionId,
+    words,
+    skillIds,
+    lang,
+  })
+  const firstSkillId = activateNextPendingSkill(session)
+  return { session, firstSkillId }
 }

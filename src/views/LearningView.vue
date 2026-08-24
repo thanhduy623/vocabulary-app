@@ -1,38 +1,93 @@
 <script setup>
+// Hosts the active skill's game component (FR-L05..L11).
+// Route: /learn/:skillId — validates against the running session, begins
+// (or resumes) the skill, and returns to Skill Selection on exit/completion.
+
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useLearningStore } from '@/stores/learningStore'
+import FlashCardGame from '@/components/learning/skills/FlashCardGame.vue'
+import ProgressStats from '@/components/learning/ProgressStats.vue'
 
 const route = useRoute()
-const learningStore = useLearningStore()
+const router = useRouter()
+const store = useLearningStore()
 
 const skillId = computed(() => String(route.params.skillId ?? ''))
+const skillMeta = computed(
+  () => store.learningSession?.skills?.[skillId.value]?.meta ?? null,
+)
+const progress = computed(() =>
+  skillId.value === store.activeSkillId ? store.currentProgress : null,
+)
 
-// TODO(Phase 4): host the relevant <XxxGame.vue> based on skillId + stats bar.
+/** Component registry — adding a skill UI = one entry here. */
+const GAME_COMPONENTS = {
+  FLASH_CARD: FlashCardGame,
+}
+
+const gameComponent = computed(() => GAME_COMPONENTS[skillId.value] ?? null)
+
+// Validate the route against the session; begin/resume the skill.
+if (
+  !store.learningSession ||
+  !store.learningSession.selectedSkillOrder.includes(skillId.value)
+) {
+  router.replace({ name: 'skill-selection' })
+} else {
+  if (store.activeSkillId !== skillId.value) {
+    store.enterSkill(skillId.value)
+  }
+}
+
+/**
+ * Any navigation away from an ACTIVE skill (header Back, browser Back, …)
+ * forgets that skill's process; the word list chosen earlier stays intact.
+ * Natural completion already released the pointer via finishActiveSkill(),
+ * so the guard is a no-op there.
+ */
+onBeforeRouteLeave(() => {
+  if (store.activeSkillId) {
+    store.abandonActiveSkill()
+  }
+})
+
+/** FlashCardGame finished naturally → keep the ✓ record, go pick next skill. */
+function onSkillCompleted() {
+  store.finishActiveSkill()
+  router.push({ name: 'skill-selection' })
+}
 </script>
 
 <template>
   <section class="learning-view learning-shell">
-    <div class="learning-stage d-flex flex-column">
-      <div class="d-flex align-items-center justify-content-between mb-3">
-        <h1 class="h4 mb-0">Skill: {{ skillId }}</h1>
-        <span class="badge text-bg-secondary">Chưa bắt đầu</span>
-      </div>
-
-      <div class="text-center text-muted border rounded p-5 flex-fill d-flex flex-column justify-content-center">
-        <p class="mb-0 fs-5">Giao diện luyện tập sẽ hiển thị tại đây.</p>
-        <p class="small mb-0">(Learning engine — Phase 4)</p>
-      </div>
-
-      <div class="sticky-action-bar d-flex justify-content-center gap-2">
-        <button
-          type="button"
-          class="btn btn-outline-secondary"
-          @click="learningStore.exitSkill(); $router.push({ name: 'skill-selection' })"
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <div class="d-flex align-items-center gap-2">
+        <h1 class="h5 mb-0">{{ skillMeta?.label ?? skillId }}</h1>
+        <span
+          v-if="store.isSkillCompletedNow"
+          class="badge text-bg-success"
         >
-          Quay lại chế độ học
-        </button>
+          Hoàn thành ✓
+        </span>
       </div>
+    </div>
+
+    <!-- Fallback stats when the game doesn't render its own -->
+    <ProgressStats v-if="progress && !gameComponent" :progress="progress" />
+
+    <!-- Skill host: one registered component per skill id -->
+    <component
+      :is="gameComponent"
+      v-if="gameComponent"
+      @completed="onSkillCompleted"
+    />
+
+    <div
+      v-else
+      class="flex-fill d-flex align-items-center justify-content-center text-muted border rounded p-4 my-3"
+    >
+      Kỹ năng này chưa có giao diện luyện tập.
     </div>
   </section>
 </template>

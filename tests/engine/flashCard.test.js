@@ -2,6 +2,14 @@ import { describe, it, expect } from 'vitest'
 import flashCard from '@/engine/skills/flashCard'
 import { createRng } from '@/engine/core/math'
 import { FLASH_CARD_ACTIONS } from '@/engine/core/constants'
+import {
+  createLearningSession,
+  beginSkill,
+  getCurrentItem,
+  submitAnswer,
+  getProgress,
+  isSessionComplete,
+} from '@/engine'
 import { freshWords } from './helpers'
 
 describe('FLASH_CARD generation (BR-40)', () => {
@@ -61,5 +69,51 @@ describe('FLASH_CARD evaluate (BR-42)', () => {
   it('unknown actions are not correct', () => {
     expect(flashCard.evaluate(item, { value: 'zzz' }).correct).toBe(false)
     expect(flashCard.evaluate(item, {}).correct).toBe(false)
+  })
+})
+
+describe('FLASH_CARD session flow (BR-41..43, FR-L06)', () => {
+  it('mixed Đã nhớ / Học lại run completes only when every card is mastered', () => {
+    const session = createLearningSession({
+      collectionId: 'c1',
+      words: freshWords().slice(0, 2), // 2 words → 6 cards
+      skillIds: ['FLASH_CARD'],
+      seed: 90,
+    })
+    beginSkill(session, 'FLASH_CARD')
+
+    const total = session.skills.FLASH_CARD.total
+    expect(total).toBe(6)
+
+    let guard = 0
+    let sawRetry = false
+    while (!isSessionComplete(session)) {
+      const item = getCurrentItem(session, 'FLASH_CARD')
+      if (!item) break
+
+      // "Học lại" the very first card once; everything else "Đã nhớ".
+      const action =
+        item.attempts === 0 && !sawRetry
+          ? FLASH_CARD_ACTIONS.RETRY
+          : FLASH_CARD_ACTIONS.REMEMBERED
+      if (action === FLASH_CARD_ACTIONS.RETRY) sawRetry = true
+
+      const result = submitAnswer(session, 'FLASH_CARD', { value: action })
+      if (action === FLASH_CARD_ACTIONS.RETRY) {
+        expect(result.reQueued).toBe(true)
+        expect(result.correct).toBe(false)
+      }
+
+      guard += 1
+      expect(guard).toBeLessThan(100) // must terminate: retries always come back
+    }
+
+    const p = getProgress(session, 'FLASH_CARD')
+    expect(p.status).toBe('completed')
+    expect(p.remaining).toBe(0)
+    // completed counts distinct mastered cards — never inflated by retries
+    expect(p.completed).toBe(total)
+    expect(sawRetry).toBe(true)
+    expect(isSessionComplete(session)).toBe(true)
   })
 })

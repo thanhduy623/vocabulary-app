@@ -11,6 +11,7 @@ export {
   beginSkill,
   findPendingSkill,
   activateNextPendingSkill,
+  resetSkill,
   getCurrentItem,
   skipToNextItem,
   backToPreviousItem,

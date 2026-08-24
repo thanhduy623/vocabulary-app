@@ -25,11 +25,6 @@ defineEmits(['learn', 'words', 'edit', 'delete'])
       <p class="card-text small text-muted mb-2">
         {{ collection.language }}
       </p>
-      <p class="card-text small text-muted mb-3">
-        <time :datetime="collection.createdAt">
-          {{ new Date(collection.createdAt).toLocaleDateString() }}
-        </time>
-      </p>
 
       <div class="mt-auto d-grid gap-2">
         <div class="btn-group d-flex" role="group" aria-label="Collection actions">

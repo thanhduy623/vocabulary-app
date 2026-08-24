@@ -78,9 +78,42 @@ export function createLearningSession({
     lang,
     startedAt: new Date().toISOString(),
     seed: usedSeed,
+    // Word snapshot kept on the session so a skill plan can be regenerated
+    // fresh (resetSkill) — mastered items are removed from the queue, so the
+    // original words are required to rebuild it.
+    words: [...words],
     selectedSkillOrder: [...skillIds],
     skills,
   }
+}
+
+/**
+ * Forget a skill's process: regenerate its plan from scratch (fresh shuffle,
+ * zeroed counters, status back to pending). Used when the learner backs out
+ * of a skill or wants to re-study an already completed one.
+ *
+ * @param {Object} session
+ * @param {string} skillId
+ * @returns {Object} the reset plan
+ */
+export function resetSkill(session, skillId) {
+  const plan = requirePlan(session, skillId)
+  const skill = getSkill(skillId)
+  const rng = createRng(resolveSeed(null)) // fresh randomness per reset
+
+  const items = shuffle(
+    skill.generate(session.words ?? [], { rng, lang: session.lang }),
+    rng,
+  )
+
+  plan.total = items.length
+  plan.completed = 0
+  plan.correct = 0
+  plan.incorrect = 0
+  plan.status = SKILL_STATUS.PENDING
+  plan.activeItemId = null
+  plan.queue = items
+  return plan
 }
 
 /**
@@ -137,10 +170,11 @@ export function skipToNextItem(session, skillId) {
   assertActive(plan, skillId)
 
   if (plan.queue.length <= 1) return getCurrentItem(session, skillId)
-  const item = plan.queue.shift()
-  plan.queue.push(item)
-  plan.activeItemId = item.id
-  return item
+  const leaving = plan.queue.shift()
+  plan.queue.push(leaving)
+  // Current becomes the NEW head (the previously second card).
+  plan.activeItemId = plan.queue[0].id
+  return plan.queue[0]
 }
 
 /**

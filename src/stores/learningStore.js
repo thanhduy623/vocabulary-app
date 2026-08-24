@@ -1,15 +1,21 @@
 // Learning store (docs/state-management.md §2.3, business-rules BR-30..75).
 //
-// NOTE: Skeleton only. No learning engine / Firebase wiring yet, but the
-// shapes match the docs exactly so later phases fill in cleanly.
+// Layering: UI → Store → Service → Engine. The store owns the session
+// snapshot and mirrors engine results into UI-facing state
+// (activeSkillId / completedSkillIds). All domain rules live in the engine.
 
 import { defineStore } from 'pinia'
+import * as engine from '@/engine'
+import { createSession } from '@/services/learning.service'
+import { useWordsStore } from '@/stores/wordsStore'
+import { useCollectionsStore } from '@/stores/collectionsStore'
+import { useUiStore } from '@/stores/uiStore'
 
 export const MIN_WORDS_TO_STUDY = 4
 export const MIN_SKILLS_TO_START = 1
 
 /**
- * @typedef {Object} LearningSession  (populated in Phase 4 by the engine)
+ * @typedef {Object} LearningSession  engine snapshot — see docs/learning-engine.md §5
  */
 
 export const useLearningStore = defineStore('learning', {
@@ -18,32 +24,50 @@ export const useLearningStore = defineStore('learning', {
     selectedCollectionId: null,
     /** @type {string[]} UUIDs, scoped to selectedCollectionId (BR-34) */
     selectedWordIds: [],
-    /** @type {string[]} skill ids (FLASH_CARD, MULTIPLE_CHOICE, LISTENING, TYPING) */
+    /** @type {string[]} skill ids selected for this session (BR-33) */
     selectedSkillIds: [],
-    /** @type {string|null} */
+    /** @type {string|null} skill the learner is currently inside */
     activeSkillId: null,
-    /** @type {string[]} skills completed in the current session */
+    /** @type {string[]} skills mastered in the current session (UI mirror) */
     completedSkillIds: [],
-    /** @type {LearningSession|null} */
+    /** @type {LearningSession|null} engine snapshot */
     learningSession: null,
   }),
 
   getters: {
-    selectedWords: (state) => {
-      // TODO(Phase 2+): resolve ids to Word objects via wordsStore.
-      return state.selectedWordIds
-    },
-
     canProceedToSkills(state) {
       return state.selectedWordIds.length >= MIN_WORDS_TO_STUDY
     },
 
     canStart(state) {
       return (
-        this.canProceedToSkills(state) &&
+        this.canProceedToSkills &&
         state.selectedSkillIds.length >= MIN_SKILLS_TO_START &&
         Boolean(state.selectedCollectionId)
       )
+    },
+
+    /** TTS language from the collection symbol (BR-48). */
+    sessionLang(state) {
+      if (!state.learningSession) return ''
+      return state.learningSession.lang || ''
+    },
+
+    /** Current item of the active skill (engine-derived). */
+    currentItem(state) {
+      if (!state.learningSession || !state.activeSkillId) return null
+      return engine.getCurrentItem(state.learningSession, state.activeSkillId)
+    },
+
+    /** Progress of the active skill (FR-L10) or null. */
+    currentProgress(state) {
+      if (!state.learningSession || !state.activeSkillId) return null
+      return engine.getProgress(state.learningSession, state.activeSkillId)
+    },
+
+    isSkillCompletedNow(state) {
+      if (!state.learningSession || !state.activeSkillId) return false
+      return engine.isSkillComplete(state.learningSession, state.activeSkillId)
     },
 
     activeSkillCompleted(state) {
@@ -59,10 +83,12 @@ export const useLearningStore = defineStore('learning', {
   },
 
   actions: {
-    /** @param {string} id */
+    /**
+     * Select a collection; changing it resets per-collection study state
+     * (BR-30/BR-34).
+     * @param {string} id
+     */
     selectCollection(id) {
-      this.selectedCollectionId = id
-      // Changing collection resets per-collection selection (BR-34).
       if (this.selectedCollectionId !== id) {
         this.selectedWordIds = []
         this.selectedSkillIds = []
@@ -85,12 +111,9 @@ export const useLearningStore = defineStore('learning', {
 
     toggleAllWords(words) {
       const ids = words.map((w) => w.id)
-      const allSelected = ids.every((id) => this.selectedWordIds.includes(id))
+      const allSelected =
+        ids.length > 0 && ids.every((id) => this.selectedWordIds.includes(id))
       this.selectedWordIds = allSelected ? [] : ids
-    },
-
-    setSelectedSkillIds(ids) {
-      this.selectedSkillIds = [...ids]
     },
 
     toggleSkill(id) {
@@ -99,31 +122,120 @@ export const useLearningStore = defineStore('learning', {
       else this.selectedSkillIds.push(id)
     },
 
-    /** @param {string} id */
     setActiveSkill(id) {
       this.activeSkillId = id
     },
 
-    /** @param {string} id */
     markSkillCompleted(id) {
       if (!this.completedSkillIds.includes(id)) this.completedSkillIds.push(id)
     },
 
     /**
-     * Start a learning session. TODO(Phase 4): hand off to learning.service
-     * which uses the engine to build the snapshot.
+     * Start a learning session from the current selection (FR-L05/BR-35).
+     * Snapshots words from cache, builds the engine session, activates the
+     * first selected skill.
      */
-    async startSession() {
-      // TODO(Phase 4): learning.service.startSession({...}) → engine snapshot.
-      this.learningSession = null
+    startSession() {
+      if (!this.canStart) {
+        return { ok: false, error: 'Chưa đủ điều kiện bắt đầu phiên học' }
+      }
+
+      const wordsStore = useWordsStore()
+      const collectionsStore = useCollectionsStore()
+
+      // Independent word snapshot (docs/learning-engine.md §10).
+      const words = wordsStore
+        .wordsOf(this.selectedCollectionId)
+        .filter((w) => this.selectedWordIds.includes(w.id))
+        .map((w) => ({ ...w }))
+
+      const collection = collectionsStore.getById(this.selectedCollectionId)
+
+      try {
+        const { session, firstSkillId } = createSession({
+          collectionId: this.selectedCollectionId,
+          words,
+          skillIds: [...this.selectedSkillIds],
+          lang: collection?.symbol ?? '',
+        })
+        this.learningSession = session
+        this.activeSkillId = firstSkillId
+        return { ok: true, skillId: firstSkillId }
+      } catch (error) {
+        useUiStore().pushToast('danger', error.message || 'Không thể bắt đầu phiên học')
+        return { ok: false, error: error.message }
+      }
     },
 
-    /** Reset the active skill's progress only (BR-70). */
-    exitSkill() {
-      this.activeSkillId = null
-      if (this.learningSession?.skills?.[this.activeSkillId]) {
-        // TODO(Phase 4): clear only active skill queue.
+    /**
+     * Enter (or resume) a skill of the running session.
+     * - pending  → begins it
+     * - active   → resumes at the same position
+     * - completed→ process is NOT remembered: the plan regenerates fresh
+     * @param {string} skillId
+     */
+    enterSkill(skillId) {
+      if (!this.learningSession) return false
+      if (!this.learningSession.selectedSkillOrder.includes(skillId)) return false
+
+      const plan = this.learningSession.skills[skillId]
+      if (plan.status === 'completed') {
+        engine.resetSkill(this.learningSession, skillId)
       }
+      engine.beginSkill(this.learningSession, skillId)
+      this.activeSkillId = skillId
+      return true
+    },
+
+    /**
+     * Submit an answer for the active skill's current item and mirror the
+     * completion into completedSkillIds (BR-63).
+     * @param {Object} answer
+     */
+    answerActive(answer) {
+      if (!this.learningSession || !this.activeSkillId) return null
+      const result = engine.submitAnswer(
+        this.learningSession,
+        this.activeSkillId,
+        answer,
+      )
+      if (result.skillCompleted) {
+        this.markSkillCompleted(this.activeSkillId)
+      }
+      return result
+    },
+
+    /** Browse next card without resolving it (flash-card Tiếp theo). */
+    browseNext() {
+      if (!this.learningSession || !this.activeSkillId) return null
+      return engine.skipToNextItem(this.learningSession, this.activeSkillId)
+    },
+
+    /** Browse back to the previously browsed card (Lùi lại). */
+    browsePrevious() {
+      if (!this.learningSession || !this.activeSkillId) return null
+      return engine.backToPreviousItem(this.learningSession, this.activeSkillId)
+    },
+
+    /**
+     * Learner backed out of the active skill (header Back, route change):
+     * the process is NOT remembered — that skill's plan is regenerated fresh
+     * on next entry. The chosen word list in /learn/select-words is kept.
+     */
+    abandonActiveSkill() {
+      const id = this.activeSkillId
+      if (id && this.learningSession) {
+        engine.resetSkill(this.learningSession, id)
+        this.completedSkillIds = this.completedSkillIds.filter((x) => x !== id)
+      }
+      this.activeSkillId = null
+    },
+
+    /**
+     * Natural completion: keep the finished record (✓ badge / stats) and just
+     * release the active pointer before navigating back to Skill Selection.
+     */
+    finishActiveSkill() {
       this.activeSkillId = null
     },
 
