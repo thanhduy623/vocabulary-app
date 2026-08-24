@@ -1,0 +1,97 @@
+/* ============================================================
+   Vocabulary Learning App — Global styles
+   Bootstrap is imported in src/main.js; this file holds app-level
+   tokens, base resets and responsive viewport helpers.
+   ============================================================ */
+
+:root {
+  /* Bootstrap-compatible brand token overrides */
+  --app-brand: #6f42c1;
+  --app-brand-rgb: 111, 66, 193;
+  --app-brand-contrast: #fff;
+  --app-bg: #f8f9fa;
+  --app-surface: #ffffff;
+  --app-border: #dee2e6;
+  --app-text-muted: #6c757d;
+  --app-radius: 0.5rem;
+
+  --bs-primary: var(--app-brand);
+  --bs-primary-rgb: var(--app-brand-rgb);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  color: #212529;
+  background-color: var(--app-bg);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ------------------------------------------------------------------
+   Responsive layout helpers (see docs/architecture.md §8)
+   ------------------------------------------------------------------ */
+
+/* Scrollable main region below a sticky header */
+.app-main {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom));
+}
+
+/* Full-height learning container that maximizes usable viewport height.
+   Prefer dynamic units so mobile address-bar collapse is handled. */
+.learning-shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.learning-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Sticky action bar used on selection screens (FR-L02) */
+.sticky-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  background-color: var(--app-surface);
+  border-top: 1px solid var(--app-border);
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+}
+
+/* Buttons/tappable targets stay ≥ 44px (FR-X04) */
+.btn,
+.btn-link,
+.form-control,
+.form-select {
+  min-height: 44px;
+}
+
+.navbar-toggler-icon {
+  min-height: auto;
+}
