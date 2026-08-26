@@ -4,7 +4,8 @@
 // enabled at >= MIN_WORDS_TO_STUDY (4).
 
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
+import { ROUTE_NAMES } from '@/router/routes'
 import { useLearningStore, MIN_WORDS_TO_STUDY } from '@/stores/learningStore'
 import { useWordsStore } from '@/stores/wordsStore'
 import { useCollectionsStore } from '@/stores/collectionsStore'
@@ -44,8 +45,20 @@ function isSelected(wordId) {
 
 function proceedToSkills() {
   if (!canProceed.value) return
-  router.push({ name: 'skill-selection' })
+  router.push({ name: ROUTE_NAMES.skillSelection })
 }
+
+/**
+ * BR-72 (requirements §20): Word Selection → Home resets the whole learning
+ * context. Fires for the header Back, the logo, or browser Back, so the guard
+ * is the single source of truth. Every other transition is preserved:
+ * TIẾP keeps words/collection; word-management keeps the collection.
+ */
+onBeforeRouteLeave((to) => {
+  if (to.name === ROUTE_NAMES.home) {
+    learningStore.resetLearningContext()
+  }
+})
 
 onMounted(() => {
   if (collectionId.value) {

@@ -9,7 +9,8 @@
 //             every selected skill is done a completion banner appears.
 
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
+import { ROUTE_NAMES } from '@/router/routes'
 import { useLearningStore } from '@/stores/learningStore'
 import { listSkillMetas } from '@/engine'
 import ProgressStats from '@/components/learning/ProgressStats.vue'
@@ -56,14 +57,27 @@ async function startLearning() {
 }
 
 function backToWords() {
-  store.backToWordSelection()
-  router.push({ name: 'word-selection' })
+  // State reset is applied by onBeforeRouteLeave (BR-71) — navigation alone.
+  router.push({ name: ROUTE_NAMES.wordSelection })
 }
 
 function goHome() {
-  store.resetLearningContext()
-  router.push({ name: 'home' })
+  router.push({ name: ROUTE_NAMES.home })
 }
+
+/**
+ * BR-71/72 (requirements §20): Skill Selection → Word Selection resets the
+ * session + skill selection (keeps collection + words); → Home resets the whole
+ * learning context. Applied on ANY leave to those screens — buttons, header
+ * Back, or browser Back — so state is never accidentally lost or kept stale.
+ */
+onBeforeRouteLeave((to) => {
+  if (to.name === ROUTE_NAMES.wordSelection) {
+    store.backToWordSelection()
+  } else if (to.name === ROUTE_NAMES.home) {
+    store.resetLearningContext()
+  }
+})
 </script>
 
 <template>
@@ -159,17 +173,52 @@ function goHome() {
       </div>
     </div>
 
-    <!-- Sticky start bar: picker mode only -->
-    <div v-if="!isContinueMode" class="sticky-action-bar text-end">
+    <!-- Sticky footer — picker mode: back to words + start (BR-33, min 1 skill) -->
+    <div
+      v-if="!isContinueMode"
+      class="sticky-action-bar d-flex align-items-center justify-content-between flex-wrap gap-2"
+    >
       <button
         type="button"
-        class="btn btn-primary d-inline-flex align-items-center gap-2"
-        :disabled="!store.canStart"
-        @click="startLearning"
+        class="btn btn-outline-secondary d-inline-flex align-items-center gap-2"
+        @click="backToWords"
       >
-        Bắt đầu học
-        <span aria-hidden="true">&rarr;</span>
+        <span aria-hidden="true">&larr;</span>
+        Quay lại từ vựng
       </button>
+
+      <div class="d-inline-flex align-items-center gap-2 ms-auto">
+        <span
+          v-if="store.selectedSkillIds.length === 0"
+          class="small text-muted d-none d-sm-inline"
+        >
+          Chọn ít nhất 1 kỹ năng
+        </span>
+        <button
+          type="button"
+          class="btn btn-primary d-inline-flex align-items-center gap-2"
+          :disabled="!store.canStart"
+          @click="startLearning"
+        >
+          Bắt đầu học
+          <span aria-hidden="true">&rarr;</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Sticky footer — continue mode (not yet complete): change words -->
+    <div
+      v-else-if="!store.isSessionComplete"
+      class="sticky-action-bar d-flex align-items-center justify-content-between flex-wrap gap-2"
+    >
+      <button
+        type="button"
+        class="btn btn-outline-secondary"
+        @click="backToWords"
+      >
+        Đổi từ vựng
+      </button>
+      <span class="small text-muted">Nhấp vào một kỹ năng để học tiếp</span>
     </div>
   </section>
 </template>

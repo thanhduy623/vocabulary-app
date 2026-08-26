@@ -11,7 +11,7 @@
 
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useLearningStore } from '@/stores/learningStore'
-import { speak } from '@/services/audio.service'
+import { speak } from '@/services/speech'
 import { FLASH_CARD_ACTIONS } from '@/engine'
 import ProgressStats from '@/components/learning/ProgressStats.vue'
 

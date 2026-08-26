@@ -7,6 +7,9 @@ import { computed } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useLearningStore } from '@/stores/learningStore'
 import FlashCardGame from '@/components/learning/skills/FlashCardGame.vue'
+import MultipleChoiceGame from '@/components/learning/skills/MultipleChoiceGame.vue'
+import ListeningGame from '@/components/learning/skills/ListeningGame.vue'
+import TypingGame from '@/components/learning/skills/TypingGame.vue'
 import ProgressStats from '@/components/learning/ProgressStats.vue'
 
 const route = useRoute()
@@ -24,6 +27,9 @@ const progress = computed(() =>
 /** Component registry — adding a skill UI = one entry here. */
 const GAME_COMPONENTS = {
   FLASH_CARD: FlashCardGame,
+  MULTIPLE_CHOICE: MultipleChoiceGame,
+  LISTENING: ListeningGame,
+  TYPING: TypingGame,
 }
 
 const gameComponent = computed(() => GAME_COMPONENTS[skillId.value] ?? null)

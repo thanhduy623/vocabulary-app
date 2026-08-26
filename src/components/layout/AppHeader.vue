@@ -1,6 +1,8 @@
 <script setup>
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { ROUTE_NAMES } from '@/router/routes'
 import { useCollectionsStore } from '@/stores/collectionsStore'
+import { useLearningStore } from '@/stores/learningStore'
 import { useUiStore } from '@/stores/uiStore'
 
 defineProps({
@@ -10,19 +12,50 @@ defineProps({
   },
 })
 
+const route = useRoute()
 const router = useRouter()
 const collectionsStore = useCollectionsStore()
+const learningStore = useLearningStore()
 const uiStore = useUiStore()
 
 function goHome() {
-  router.push({ name: 'home' })
+  router.push({ name: ROUTE_NAMES.home })
 }
 
+/**
+ * State-driven Back (BR-70…72 — docs/architecture.md §6). The header Back maps
+ * to the documented previous screen of the current flow instead of a blind
+ * router.back():
+ *   - learning            → skill-selection
+ *   - skill-selection     → word-selection (PICKER mode only)
+ *   - word-selection      → home
+ *   - word-management     → home
+ *
+ * During a running session (continue mode) skill-selection falls back to the
+ * browser history so the session / completedSkillIds is never destroyed
+ * accidentally. State resets live in each view's onBeforeRouteLeave guard —
+ * this handler only navigates, it never mutates learning state itself.
+ */
 function goBack() {
+  const name = route.name
+
+  if (name === ROUTE_NAMES.learning) {
+    router.push({ name: ROUTE_NAMES.skillSelection })
+    return
+  }
+  if (name === ROUTE_NAMES.skillSelection && !learningStore.learningSession) {
+    router.push({ name: ROUTE_NAMES.wordSelection })
+    return
+  }
+  if (name === ROUTE_NAMES.wordSelection || name === ROUTE_NAMES.wordManagement) {
+    router.push({ name: ROUTE_NAMES.home })
+    return
+  }
+  // Fallback: honor browser history, else home.
   if (window.history.length > 1) {
     router.back()
   } else {
-    router.push({ name: 'home' })
+    router.push({ name: ROUTE_NAMES.home })
   }
 }
 
