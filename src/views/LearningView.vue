@@ -5,6 +5,7 @@
 
 import { computed } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
+import { ROUTE_NAMES } from '@/router/routes'
 import { useLearningStore } from '@/stores/learningStore'
 import FlashCardGame from '@/components/learning/skills/FlashCardGame.vue'
 import MultipleChoiceGame from '@/components/learning/skills/MultipleChoiceGame.vue'
@@ -47,21 +48,22 @@ if (
 }
 
 /**
- * Any navigation away from an ACTIVE skill (header Back, browser Back, …)
- * forgets that skill's process; the word list chosen earlier stays intact.
- * Natural completion already released the pointer via finishActiveSkill(),
- * so the guard is a no-op there.
+ * Leaving Learning = intent to pick the next skill → discard the whole session
+ * and its progress (header Back, browser Back, or the completion navigation).
+ * The selected collection + words are kept so the learner can start again or
+ * go back to adjust them. Going straight Home resets the entire context.
  */
-onBeforeRouteLeave(() => {
-  if (store.activeSkillId) {
-    store.abandonActiveSkill()
+onBeforeRouteLeave((to) => {
+  if (to.name === ROUTE_NAMES.home) {
+    store.resetLearningContext()
+  } else {
+    store.clearLearningSession()
   }
 })
 
-/** FlashCardGame finished naturally → keep the ✓ record, go pick next skill. */
+/** Skill completed → return to a fresh Skill Selection picker. */
 function onSkillCompleted() {
-  store.finishActiveSkill()
-  router.push({ name: 'skill-selection' })
+  router.push({ name: ROUTE_NAMES.skillSelection })
 }
 </script>
 

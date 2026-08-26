@@ -1,19 +1,16 @@
 <script setup>
-// Skill Selection screen (FR-L04, BR-33; continue flow BR-63/64, req §18/§19).
+// Skill Selection screen (FR-L04, BR-33, req §16/§18).
 //
-// Two modes:
-//  - PICKER   (no running session): toggle 1..4 skill cards → BẮT ĐẦU starts
-//             the session via learningStore.
-//  - CONTINUE (session exists): show the session's skills with live status;
-//             click a pending one to enter it; completed ones show ✓. When
-//             every selected skill is done a completion banner appears.
+// Fresh multi-select picker every time it's shown. Leaving Learning (exit or
+// completion) clears the whole session progression (learningStore
+// .clearLearningSession), so the cards never show stale progress or lock the
+// learner into the previous selection — any skill can be (re)chosen freely.
+// The collection + chosen words are preserved so starting again is one tap.
 
-import { computed } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import { ROUTE_NAMES } from '@/router/routes'
 import { useLearningStore } from '@/stores/learningStore'
 import { listSkillMetas } from '@/engine'
-import ProgressStats from '@/components/learning/ProgressStats.vue'
 
 const router = useRouter()
 const store = useLearningStore()
@@ -21,30 +18,12 @@ const store = useLearningStore()
 /** All registered skills (single source of truth = engine registry). */
 const ALL_SKILLS = listSkillMetas()
 
-const isContinueMode = computed(() => Boolean(store.learningSession))
-
-function statusOf(skillId) {
-  if (!store.learningSession) return null
-  return store.learningSession.skills[skillId]?.status ?? 'pending'
-}
-
-const progressOf = (skillId) =>
-  store.learningSession ? store.learningSession.skills[skillId] : null
-
 function isSelected(skillId) {
   return store.selectedSkillIds.includes(skillId)
 }
 
-function onCardClick(skillId) {
-  if (!isContinueMode.value) {
-    store.toggleSkill(skillId)
-    return
-  }
-  // Pending → enter; completed → process isn't remembered, so re-entering
-  // regenerates a fresh plan (store.enterSkill handles the reset).
-  if (store.enterSkill(skillId)) {
-    router.push({ name: 'learning', params: { skillId } })
-  }
+function toggleSkill(skillId) {
+  store.toggleSkill(skillId)
 }
 
 async function startLearning() {
@@ -61,15 +40,10 @@ function backToWords() {
   router.push({ name: ROUTE_NAMES.wordSelection })
 }
 
-function goHome() {
-  router.push({ name: ROUTE_NAMES.home })
-}
-
 /**
  * BR-71/72 (requirements §20): Skill Selection → Word Selection resets the
  * session + skill selection (keeps collection + words); → Home resets the whole
- * learning context. Applied on ANY leave to those screens — buttons, header
- * Back, or browser Back — so state is never accidentally lost or kept stale.
+ * learning context. Applied on ANY leave — buttons, header Back, browser Back.
  */
 onBeforeRouteLeave((to) => {
   if (to.name === ROUTE_NAMES.wordSelection) {
@@ -82,35 +56,15 @@ onBeforeRouteLeave((to) => {
 
 <template>
   <section class="skill-selection-view">
-    <!-- Session complete banner (BR-64) -->
-    <div v-if="isContinueMode && store.isSessionComplete" class="alert alert-success d-flex flex-wrap align-items-center gap-2">
-      <div class="me-auto">
-        <strong>🎉 Hoàn thành phiên học!</strong>
-        <span class="d-block small">Bạn đã hoàn thành tất cả kỹ năng đã chọn.</span>
-      </div>
-      <button type="button" class="btn btn-sm btn-outline-success" @click="backToWords">
-        Chọn từ khác
-      </button>
-      <button type="button" class="btn btn-sm btn-success" @click="goHome">
-        Về trang chủ
-      </button>
-    </div>
-
     <div class="d-flex align-items-center justify-content-between mb-3">
-      <h1 class="h3 mb-0">
-        {{ isContinueMode ? 'Tiếp tục phiên học' : 'Chọn chế độ học' }}
-      </h1>
-      <span v-if="!isContinueMode" class="badge text-bg-primary">
+      <h1 class="h3 mb-0">Chọn chế độ học</h1>
+      <span class="badge text-bg-primary">
         Đã chọn: {{ store.selectedSkillIds.length }}
       </span>
     </div>
 
     <p class="text-muted">
-      {{
-        isContinueMode
-          ? 'Nhấp vào một kỹ năng chưa hoàn thành để tiếp tục.'
-          : 'Chọn ít nhất 01 chế độ để bắt đầu. Bạn có thể chọn nhiều chế độ.'
-      }}
+      Chọn ít nhất 01 chế độ để bắt đầu. Bạn có thể chọn nhiều chế độ.
     </p>
 
     <div class="row g-3">
@@ -122,62 +76,25 @@ onBeforeRouteLeave((to) => {
         <button
           type="button"
           class="card h-100 w-100 border text-start p-0 skill-card position-relative"
-          :title="
-            isContinueMode && statusOf(skill.id) === 'completed'
-              ? 'Nhấp để học lại từ đầu'
-              : null
-          "
-          :class="{
-            'border-primary': !isContinueMode && isSelected(skill.id),
-            'opacity-75':
-              isContinueMode &&
-              statusOf(skill.id) === 'completed' &&
-              store.isSessionComplete,
-          }"
-          @click="onCardClick(skill.id)"
+          :class="{ 'border-primary': isSelected(skill.id) }"
+          @click="toggleSkill(skill.id)"
         >
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start">
               <h2 class="h5 card-title mb-1">{{ skill.label }}</h2>
-
-              <!-- Continue mode status -->
-              <span
-                v-if="isContinueMode && statusOf(skill.id) === 'completed'"
-                class="badge text-bg-success"
-              >
-                ✓ Hoàn thành
-              </span>
-              <span
-                v-else-if="isContinueMode"
-                class="badge text-bg-warning text-dark"
-              >
-                Còn lại
-              </span>
-
-              <!-- Picker mode check -->
-              <span v-else-if="isSelected(skill.id)" class="badge text-bg-primary">
+              <span v-if="isSelected(skill.id)" class="badge text-bg-primary">
                 ✓
               </span>
             </div>
 
             <p class="card-text small text-muted mb-2">{{ skill.description }}</p>
-
-            <!-- Per-skill progress in continue mode -->
-            <ProgressStats
-              v-if="isContinueMode && progressOf(skill.id)"
-              :progress="progressOf(skill.id)"
-              class="mb-0"
-            />
           </div>
         </button>
       </div>
     </div>
 
-    <!-- Sticky footer — picker mode: back to words + start (BR-33, min 1 skill) -->
-    <div
-      v-if="!isContinueMode"
-      class="sticky-action-bar d-flex align-items-center justify-content-between flex-wrap gap-2"
-    >
+    <!-- Sticky footer: back to words + start (BR-33, min 1 skill) -->
+    <div class="sticky-action-bar d-flex align-items-center justify-content-between flex-wrap gap-2">
       <button
         type="button"
         class="btn btn-outline-secondary d-inline-flex align-items-center gap-2"
@@ -204,21 +121,6 @@ onBeforeRouteLeave((to) => {
           <span aria-hidden="true">&rarr;</span>
         </button>
       </div>
-    </div>
-
-    <!-- Sticky footer — continue mode (not yet complete): change words -->
-    <div
-      v-else-if="!store.isSessionComplete"
-      class="sticky-action-bar d-flex align-items-center justify-content-between flex-wrap gap-2"
-    >
-      <button
-        type="button"
-        class="btn btn-outline-secondary"
-        @click="backToWords"
-      >
-        Đổi từ vựng
-      </button>
-      <span class="small text-muted">Nhấp vào một kỹ năng để học tiếp</span>
     </div>
   </section>
 </template>

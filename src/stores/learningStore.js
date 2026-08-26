@@ -218,33 +218,23 @@ export const useLearningStore = defineStore('learning', {
     },
 
     /**
-     * Learner backed out of the active skill (header Back, route change):
-     * the process is NOT remembered — that skill's plan is regenerated fresh
-     * on next entry. The chosen word list in /learn/select-words is kept.
+     * Learning → Skill Selection (exit OR completion). The learner intends to
+     * pick the next skill, so the whole session + its progress are discarded —
+     * Skill Selection returns to a fresh picker (no progress bars, every skill
+     * freely selectable again).
+     * Kept:    selectedCollectionId, selectedWordIds (restart or adjust words)
+     * Cleared: selectedSkillIds, activeSkillId, completedSkillIds, learningSession
      */
-    abandonActiveSkill() {
-      const id = this.activeSkillId
-      if (id && this.learningSession) {
-        engine.resetSkill(this.learningSession, id)
-        this.completedSkillIds = this.completedSkillIds.filter((x) => x !== id)
-      }
-      this.activeSkillId = null
-    },
-
-    /**
-     * Natural completion: keep the finished record (✓ badge / stats) and just
-     * release the active pointer before navigating back to Skill Selection.
-     */
-    finishActiveSkill() {
-      this.activeSkillId = null
-    },
-
-    /** Skill Selection → Word Selection (BR-71). */
-    backToWordSelection() {
+    clearLearningSession() {
       this.selectedSkillIds = []
       this.activeSkillId = null
       this.completedSkillIds = []
       this.learningSession = null
+    },
+
+    /** Skill Selection → Word Selection (BR-71): same session reset. */
+    backToWordSelection() {
+      this.clearLearningSession()
     },
 
     /** Word Selection → Home (BR-72): reset whole learning context. */
