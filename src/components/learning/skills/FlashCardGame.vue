@@ -223,6 +223,13 @@ if (store.isSkillCompletedNow) emit('completed')
 
 .fc-back {
   transform: rotateY(180deg);
+  /* Safe-area padding so the action buttons stay above mobile browser bars. */
+  padding-bottom: max(1.5rem, calc(0.75rem + env(safe-area-inset-bottom)));
+}
+
+/* Actions wrap on narrow portrait screens so both buttons stay tappable. */
+.fc-actions {
+  flex-wrap: wrap;
 }
 
 .fc-text {

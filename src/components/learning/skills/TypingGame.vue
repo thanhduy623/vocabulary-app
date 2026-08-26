@@ -17,6 +17,7 @@
 
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useLearningStore } from '@/stores/learningStore'
+import { speak, stopSpeaking } from '@/services/speech'
 import { getSkill } from '@/engine'
 import ProgressStats from '@/components/learning/ProgressStats.vue'
 
@@ -37,6 +38,22 @@ const submittedValue = ref('')
 const submitted = ref(false)
 /** If the submitted answer was correct. */
 const wasCorrect = ref(false)
+/** Set while the last TTS attempt failed so the UI can hint (AMB-12). */
+const speechUnavailable = ref(false)
+
+/** Speak the current WORD (auto-plays on new questions). */
+function speakCurrent() {
+  if (!item.value) return
+  const result = speak(
+    item.value.payload.audioText || item.value.payload.prompt,
+    store.sessionLang,
+  )
+  speechUnavailable.value = !result.ok
+}
+
+function replayAudio() {
+  speakCurrent()
+}
 
 /** Human-facing prompt label by question template (empty input hint). */
 const QUESTION_LABELS = {
@@ -85,7 +102,7 @@ const feedbackClass = computed(() => {
   return wasCorrect.value ? 'is-correct' : 'is-wrong'
 })
 
-// Reset the input + answer state whenever the question changes.
+// Reset the input + answer state and auto-play whenever the question changes.
 watch(
   () => item.value?.id,
   async () => {
@@ -95,6 +112,7 @@ watch(
     wasCorrect.value = false
     await nextTick()
     inputEl.value?.focus()
+    speakCurrent()
   },
   { immediate: true },
 )
@@ -138,7 +156,10 @@ onMounted(() => {
   inputEl.value?.focus()
   window.addEventListener('keydown', onGlobalKeydown)
 })
-onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onGlobalKeydown)
+  stopSpeaking()
+})
 
 // Notify parent immediately when this skill is already finished.
 if (store.isSkillCompletedNow) emit('completed')
@@ -154,6 +175,15 @@ if (store.isSkillCompletedNow) emit('completed')
         <span class="badge type-badge-key">{{ questionLabel }}</span>
         <span class="type-arrow" aria-hidden="true">→</span>
         <span class="badge type-badge-answer">Gõ: {{ targetLabelUpper }}</span>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-primary type-replay"
+          :title="speechUnavailable ? 'Thiết bị không hỗ trợ đọc phát âm' : 'Nghe lại'"
+          aria-label="Nghe lại phát âm"
+          @click="replayAudio"
+        >
+          🔊 Nghe
+        </button>
       </div>
 
       <!-- The prompt (the "key" shown to the learner) -->

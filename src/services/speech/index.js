@@ -6,6 +6,7 @@
 export {
   isSpeechAvailable,
   normalizeLang,
+  getVoices,
   pickVoice,
   speak,
   stopSpeaking,

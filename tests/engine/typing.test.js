@@ -5,11 +5,15 @@ import { freshWords } from './helpers'
 
 describe('TYPING generation (BR-50)', () => {
   it('generates 3 templates per fully-populated word', () => {
-    const items = typing.generate(freshWords())
-    expect(items.length).toBe(freshWords().length * 3)
+    const words = freshWords()
+    const items = typing.generate(words)
+    expect(items.length).toBe(words.length * 3)
     for (const item of items) {
+      const source = words.find((w) => w.id === item.sourceWordId)
       expect(item.payload.prompt).toBeTruthy()
       expect(item.payload.expected).toBeTruthy()
+      // TTS always pronounces the WORD field (most accurate), not the prompt.
+      expect(item.payload.audioText).toBe(source.word)
     }
   })
 

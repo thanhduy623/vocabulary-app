@@ -58,6 +58,8 @@ export function generate(words, { rng }) {
             promptField,
             answerField,
             expected,
+            // audioText = the WORD field: the most accurate thing to pronounce.
+            audioText: String(w.word ?? '').trim(),
             options: buildOptions({ expected, pool, rng }),
           },
         }),

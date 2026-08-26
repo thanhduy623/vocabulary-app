@@ -23,11 +23,15 @@ describe('MULTIPLE_CHOICE generation (BR-44/45)', () => {
   })
 
   it('builds exactly 4 unique options containing the expected answer', () => {
-    const items = multipleChoice.generate(freshWords(), { rng: createRng(62) })
+    const words = freshWords()
+    const items = multipleChoice.generate(words, { rng: createRng(62) })
     for (const item of items) {
       expect(item.payload.options.length).toBe(4)
       expect(new Set(item.payload.options).size).toBe(4)
       expect(item.payload.options).toContain(item.payload.expected)
+      const source = words.find((w) => w.id === item.sourceWordId)
+      // TTS always pronounces the WORD field (most accurate), not the prompt.
+      expect(item.payload.audioText).toBe(source.word)
       expect(item.payload.prompt).toBeTruthy()
     }
   })

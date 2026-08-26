@@ -84,18 +84,22 @@ function onSkillCompleted() {
     <!-- Fallback stats when the game doesn't render its own -->
     <ProgressStats v-if="progress && !gameComponent" :progress="progress" />
 
-    <!-- Skill host: one registered component per skill id -->
-    <component
-      :is="gameComponent"
-      v-if="gameComponent"
-      @completed="onSkillCompleted"
-    />
+    <!-- Scrollable stage: keeps controls reachable and progress sticky on
+         short/landscape viewports; the header stays accessible above. -->
+    <div class="learning-stage">
+      <!-- Skill host: one registered component per skill id -->
+      <component
+        :is="gameComponent"
+        v-if="gameComponent"
+        @completed="onSkillCompleted"
+      />
 
-    <div
-      v-else
-      class="flex-fill d-flex align-items-center justify-content-center text-muted border rounded p-4 my-3"
-    >
-      Kỹ năng này chưa có giao diện luyện tập.
+      <div
+        v-else
+        class="d-flex align-items-center justify-content-center text-muted border rounded p-4 my-3 h-100"
+      >
+        Kỹ năng này chưa có giao diện luyện tập.
+      </div>
     </div>
   </section>
 </template>

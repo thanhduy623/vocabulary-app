@@ -15,6 +15,9 @@
   --app-text-muted: #6c757d;
   --app-radius: 0.5rem;
 
+  /* App header height (sticky navbar) — used by viewport-aware learning shell */
+  --app-header-h: 56px;
+
   --bs-primary: var(--app-brand);
   --bs-primary-rgb: var(--app-brand-rgb);
 }
@@ -61,17 +64,43 @@ body {
 }
 
 /* Full-height learning container that maximizes usable viewport height.
-   Prefer dynamic units so mobile address-bar collapse is handled. */
+   The sticky header is in normal flow, so subtract its height (avoid double
+   viewport). svh (small) first for mobile toolbars, dvh overrides when the
+   address bar collapses. Height (not min-height) makes the inner
+   .learning-stage the scroll region — controls never get pushed out of reach
+   and the page itself doesn't double-scroll. */
 .learning-shell {
-  min-height: 100dvh;
+  height: calc(100svh - var(--app-header-h, 56px) - 1rem);
+  height: calc(100dvh - var(--app-header-h, 56px) - 1rem);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
+/* Tighter margins on the learning screens so the shell fills the viewport. */
+.app-main:has(.learning-shell) {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+/* Scroll region of a learning screen. Bottom padding uses the safe-area inset
+   so the last buttons stay above mobile browser chrome. */
 .learning-stage {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
+/* Keep progress readable while the question area scrolls on short screens. */
+.learning-stage .progress-stats {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background-color: var(--app-bg);
+  padding: 0.25rem 0 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 /* Sticky action bar used on selection screens (FR-L02) */

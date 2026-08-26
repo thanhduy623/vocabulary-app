@@ -13,6 +13,7 @@
 
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useLearningStore } from '@/stores/learningStore'
+import { speak, stopSpeaking } from '@/services/speech'
 import ProgressStats from '@/components/learning/ProgressStats.vue'
 
 const emit = defineEmits(['completed'])
@@ -26,6 +27,22 @@ const progress = computed(() => store.currentProgress)
 const selectedIndex = ref(null)
 /** If the chosen option was correct (only meaningful once answered). */
 const wasCorrect = ref(false)
+/** Set while the last TTS attempt failed so the UI can hint (AMB-12). */
+const speechUnavailable = ref(false)
+
+/** Speak the current WORD (auto-plays on new questions). */
+function speakCurrent() {
+  if (!item.value) return
+  const result = speak(
+    item.value.payload.audioText || item.value.payload.prompt,
+    store.sessionLang,
+  )
+  speechUnavailable.value = !result.ok
+}
+
+function replayAudio() {
+  speakCurrent()
+}
 
 const options = computed(() => item.value?.payload?.options ?? [])
 const correctIndex = computed(() =>
@@ -48,13 +65,15 @@ const questionLabel = computed(
 
 const answered = computed(() => selectedIndex.value !== null)
 
-// Reset the answer state whenever the current question changes.
+// Reset the answer state and auto-play whenever the question changes.
 watch(
   () => item.value?.id,
   () => {
     selectedIndex.value = null
     wasCorrect.value = false
+    // speakCurrent()
   },
+  { immediate: true },
 )
 
 /** Pick an option (no-op once answered — answer is locked). */
@@ -62,6 +81,9 @@ function pick(index) {
   if (!item.value || answered.value) return
   selectedIndex.value = index
   wasCorrect.value = index === correctIndex.value
+  // Auto-play after the choice is made: re-pronounce the prompt so the
+  // learner hears it right when the answer is locked in.
+  speakCurrent()
 }
 
 /** Commit the chosen answer to the engine and move on. */
@@ -103,7 +125,10 @@ function onKeydown(event) {
 }
 
 onMounted(() => window.addEventListener('keydown', onKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  stopSpeaking()
+})
 
 // Notify parent immediately when this skill is already finished.
 if (store.isSkillCompletedNow) emit('completed')
@@ -114,7 +139,18 @@ if (store.isSkillCompletedNow) emit('completed')
     <ProgressStats v-if="progress" :progress="progress" />
 
     <div v-if="item" class="mcq-panel mx-auto my-1">
-      <span class="badge text-bg-secondary mb-2">{{ questionLabel }}</span>
+      <div class="d-flex align-items-center justify-content-between gap-2 mb-2 flex-wrap">
+        <span class="badge text-bg-secondary">{{ questionLabel }}</span>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-primary mcq-replay"
+          :title="speechUnavailable ? 'Thiết bị không hỗ trợ đọc phát âm' : 'Nghe lại'"
+          aria-label="Nghe lại phát âm"
+          @click="replayAudio"
+        >
+          🔊 Nghe
+        </button>
+      </div>
 
       <p class="mcq-prompt">{{ item.payload.prompt }}</p>
 

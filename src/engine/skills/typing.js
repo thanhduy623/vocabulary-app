@@ -51,6 +51,8 @@ export function generate(words) {
             keyField,
             targetField,
             expected,
+            // audioText = the WORD field: the most accurate thing to pronounce.
+            audioText: String(w.word ?? '').trim(),
             foldDiacritics: false, // opt-in stricter/looser matching flag (BR-50)
           },
         }),
