@@ -75,6 +75,7 @@ async function handleRefresh() {
     }
   } finally {
     uiStore.setAppBusy(false)
+    router.push("/");
   }
 }
 </script>
@@ -104,7 +105,6 @@ async function handleRefresh() {
             @click="goBack"
           >
             <span aria-hidden="true">&larr;</span>
-            <span class="d-none d-sm-inline">Back</span>
           </button>
 
           <!-- Refresh (purge caches + reload) -->
@@ -123,7 +123,6 @@ async function handleRefresh() {
               aria-hidden="true"
             />
             <span v-else aria-hidden="true">&#x21bb;</span>
-            <span class="d-none d-sm-inline">Refresh</span>
           </button>
         </div>
       </div>
