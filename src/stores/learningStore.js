@@ -122,6 +122,11 @@ export const useLearningStore = defineStore('learning', {
       else this.selectedSkillIds.push(id)
     },
 
+    /** Single-selection helper: only one skill is studied per session. */
+    setSelectedSkillIds(ids) {
+      this.selectedSkillIds = [...ids].slice(0, 1)
+    },
+
     setActiveSkill(id) {
       this.activeSkillId = id
     },

@@ -22,8 +22,10 @@ function isSelected(skillId) {
   return store.selectedSkillIds.includes(skillId)
 }
 
+/** Single-select: picking a card selects it alone; picking it again clears it. */
 function toggleSkill(skillId) {
-  store.toggleSkill(skillId)
+  if (isSelected(skillId)) store.setSelectedSkillIds([])
+  else store.setSelectedSkillIds([skillId])
 }
 
 async function startLearning() {
@@ -64,7 +66,7 @@ onBeforeRouteLeave((to) => {
     </div>
 
     <p class="text-muted">
-      Chọn ít nhất 01 chế độ để bắt đầu. Bạn có thể chọn nhiều chế độ.
+      Chọn 01 chế độ duy nhất để bắt đầu học.
     </p>
 
     <div class="row g-3">

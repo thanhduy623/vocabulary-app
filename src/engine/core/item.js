@@ -29,5 +29,13 @@ export function createItem({ skillId, template, sourceWordId, payload }) {
     sourceWordId,
     payload,
     attempts: 0,
+    /**
+     * Mastery debt: how many more CORRECT answers are required before this
+     * item is finally removed from the queue. Starts at 1 (answer once to
+     * learn). Every WRONG answer increases it (+1) so a misremembered item is
+     * never skipped after a single lucky correct — it has to be answered
+     * correctly enough times (per its error history) to be mastered.
+     */
+    requiredCorrect: 1,
   }
 }

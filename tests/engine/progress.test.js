@@ -79,6 +79,58 @@ describe('retry queue & progress (BR-46/49/51, BR-60..62)', () => {
     expect(isSkillComplete(session, MULTIPLE_CHOICE)).toBe(true)
   })
 
+  it('does NOT skip an item after a wrong answer — it fully re-appears', () => {
+    // The mastery-debt model: a missed item must be answered correctly enough
+    // times (its error count + 1) before it is mastered and removed. One
+    // correct after many wrongs is NOT enough — it must keep coming back.
+    const session = createLearningSession({
+      words: freshWords().slice(0, 1),
+      skillIds: [MULTIPLE_CHOICE],
+      seed: 21,
+    })
+    beginSkill(session, MULTIPLE_CHOICE)
+
+    // Deterministic: collapse the skill to ONE specific item so every answer
+    // below targets the exact same question (avoids queue-shuffle ambiguity).
+    const plan = session.skills[MULTIPLE_CHOICE]
+    const target = getCurrentItem(session, MULTIPLE_CHOICE)
+    plan.queue = [target]
+    plan.activeItemId = target.id
+
+    const wrongAns = (item) => ({
+      option: item.payload.options.find((o) => o !== item.payload.expected) ?? '',
+    })
+    const rightAns = (item) => ({ option: item.payload.expected })
+
+    // 3 mistakes on the SAME item, then ONE correct answer…
+    submitAnswer(session, MULTIPLE_CHOICE, wrongAns(target))
+    submitAnswer(session, MULTIPLE_CHOICE, wrongAns(target))
+    submitAnswer(session, MULTIPLE_CHOICE, wrongAns(target))
+    const afterOneCorrect = submitAnswer(session, MULTIPLE_CHOICE, rightAns(target))
+
+    // …that single correct must NOT master it: debt = 1 + 3 wrongs = 4,
+    // one correct → 3 → still re-queued, NOT completed, so never skipped.
+    expect(afterOneCorrect.correct).toBe(true)
+    expect(afterOneCorrect.reQueued).toBe(true)
+    expect(getProgress(session, MULTIPLE_CHOICE).completed).toBe(0)
+    expect(getProgress(session, MULTIPLE_CHOICE).remaining).toBe(1)
+    expect(
+      session.skills[MULTIPLE_CHOICE].queue.some((i) => i.id === target.id),
+    ).toBe(true)
+
+    // The skill only ends once the debt is fully drained by correct reps.
+    drainSkill(
+      session,
+      MULTIPLE_CHOICE,
+      (item) => ({ option: item.payload.expected }),
+      { beginSkill, getCurrentItem, submitAnswer, isSkillComplete },
+    )
+    const done = getProgress(session, MULTIPLE_CHOICE)
+    expect(done.status).toBe('completed')
+    expect(done.completed).toBe(1) // the one real item fully mastered
+    expect(done.remaining).toBe(0)
+  })
+
   it('completes a skill that had retries — queue fully drained', () => {
     const session = createLearningSession({
       words: freshWords(),

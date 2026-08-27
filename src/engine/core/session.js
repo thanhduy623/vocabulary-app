@@ -205,9 +205,18 @@ export function backToPreviousItem(session, skillId) {
 /**
  * Submit an answer for the CURRENT item of an ACTIVE skill.
  *
- * Correct  → item leaves the queue forever (completed++).
- * Wrong    → item is re-inserted at a random later position in the queue
- *            (retry semantics, BR-46/49/51/12).
+ * Mastery model (fixed "skipped retry" bug):
+ *   - every item has a `requiredCorrect` debt (starts at 1 = answer once to
+ *     learn);
+ *   - WRONG  → debt +1 and the item is re-inserted at a random later position
+ *     (it MUST come back and be answered correctly again);
+ *   - CORRECT → debt −1; if it reaches 0 the item is mastered and removed from
+ *     the queue for good.
+ *
+ * This guarantees an item is NEVER "skipped": if it was missed N times, it
+ * stays in the queue until the learner has answered it correctly enough times
+ * to cancel all of those misses (plus the baseline). Retries genuinely
+ * reappear later (BR-46/49/51/12).
  *
  * Flash cards reuse this pipeline: evaluate() maps 'remembered'→correct and
  * 'retry'→incorrect, so Đã nhớ/Học lại need no special-casing here.
@@ -227,26 +236,34 @@ export function submitAnswer(session, skillId, answer) {
     throw new Error(`submitAnswer(${skillId}): no current item`)
   }
 
+  // Normalize legacy / manually-built items that lack the mastery debt field.
+  if (!Number.isInteger(item.requiredCorrect) || item.requiredCorrect < 1) {
+    item.requiredCorrect = 1
+  }
+
   const result = getSkill(skillId).evaluate(item, answer)
   item.attempts += 1
 
   let reQueued = false
   if (result.correct) {
-    // Mastered: drop from the queue entirely.
-    plan.queue.shift()
     plan.correct += 1
-    plan.completed += 1
-  } else {
-    // Retry queue: keep the item, re-insert it at a random LATER position so
-    // it cannot repeat immediately but must come back before finishing.
-    plan.queue.shift()
-    if (plan.queue.length === 0) {
-      plan.queue.push(item)
+    item.requiredCorrect -= 1
+    if (item.requiredCorrect <= 0) {
+      // Fully mastered: drop from the queue entirely.
+      plan.queue.shift()
+      plan.completed += 1
     } else {
-      const position = randomInt(Math.random, 1, plan.queue.length)
-      plan.queue.splice(position, 0, item)
+      // Needs more correct reps → re-insert at a random later position.
+      plan.queue.shift()
+      reinsertForRetry(plan, item)
+      reQueued = true
     }
+  } else {
+    // One more correct answer is now required before this item can be mastered.
     plan.incorrect += 1
+    item.requiredCorrect += 1
+    plan.queue.shift()
+    reinsertForRetry(plan, item)
     reQueued = true
   }
 
@@ -293,6 +310,16 @@ export function isSessionComplete(session) {
 }
 
 // ---- internals -------------------------------------------------------------
+
+/** Re-insert an item at a random LATER queue position (retry semantics). */
+function reinsertForRetry(plan, item) {
+  if (plan.queue.length === 0) {
+    plan.queue.push(item)
+    return
+  }
+  const position = randomInt(Math.random, 1, plan.queue.length)
+  plan.queue.splice(position, 0, item)
+}
 
 function requirePlan(session, skillId) {
   const plan = session.skills[skillId]
