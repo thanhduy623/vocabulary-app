@@ -29,6 +29,8 @@ defineProps({
 
 <style scoped>
 .min-vh-50 {
-  min-height: 50vh;
+  /* P3/§4.3 — viewport-aware, never bare vh (mobile browser chrome). */
+  min-height: 50svh;
+  min-height: 50dvh;
 }
 </style>

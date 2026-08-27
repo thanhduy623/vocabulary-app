@@ -28,6 +28,8 @@ export const useCollectionsStore = defineStore('collections', {
     isCollectionsLoaded: false,
     /** @type {'idle'|'loading'|'error'} */
     fetchState: 'idle',
+    /** Root cause of the last failed load, surfaced on error states (§11). */
+    fetchError: '',
   }),
 
   getters: {
@@ -48,6 +50,7 @@ export const useCollectionsStore = defineStore('collections', {
       if (this.isCollectionsLoaded) return { ok: true }
 
       this.fetchState = 'loading'
+      this.fetchError = ''
       try {
         const items = await collectionsService.fetchCollections()
         this.collections = items
@@ -56,7 +59,8 @@ export const useCollectionsStore = defineStore('collections', {
         return { ok: true }
       } catch (error) {
         this.fetchState = 'error'
-        return { ok: false, error: error.message || 'Failed to load collections' }
+        this.fetchError = error?.message || 'Failed to load collections'
+        return { ok: false, error: this.fetchError }
       }
     },
 
@@ -68,6 +72,7 @@ export const useCollectionsStore = defineStore('collections', {
       this.collections = []
       this.isCollectionsLoaded = false
       this.fetchState = 'idle'
+      this.fetchError = ''
       useWordsStore().clearWords()
       return this.ensureLoaded()
     },

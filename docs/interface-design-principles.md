@@ -289,7 +289,7 @@ Hierarchy rules:
 | `AppHeader` | `layout/` | Logo (→home), Back (state-driven), Refresh. Sticky, in flow. |
 | `AppSpinner` | `common/` | Universal loading state. Use it — never an ad-hoc spinner. |
 | `ToastStack` + `ConfirmModalHost` | `common/` | Global feedback via `uiStore.pushToast` / `uiStore.confirm`. Never `alert()`/`confirm()`. |
-| `CollectionCard`, `CollectionFormModal` | `collections/` | Collection grid card + create/edit modal. |
+| `CollectionCard`, `CollectionFormModal` | `collections/` | Collection grid card + create/edit modal. `CollectionCard` anatomy: brand-tinted gradient **hero** (monogram avatar from `symbol`, `fw-semibold` title, monospace code chip + language), **meta row** (`Tạo <date>` via `lib/datetime` + 44×44 edit/delete icon buttons with `aria-label`), **action pair** (`Học ngay →` `btn-outline-primary fw-semibold` + `Từ vựng` — outline only; the Home header CTA is the page's single primary). Hover/focus lift + brand ring; `prefers-reduced-motion` honored. |
 | `FilterBar`, `WordRow`, `ComboBoxField`, `WordFormModal` | `words/` | Search/filter row, list row, combo inputs, word CRUD modal. Reuse `FilterBar` anywhere a word list needs search+filters (already used by Word Selection). |
 | `ProgressStats` | `learning/` | Progress badges + bar (BR-60..62). Required on every learning screen; sticky inside `.learning-stage`. |
 | `VocabularyDetailModal` | `learning/` | Full word detail popup (wrong-answer study card, Teleported, `Đã học` advances). Reuse for any "show word details" need. |

@@ -120,42 +120,66 @@ function goWords(id) {
 
 <template>
   <section class="home-view">
-    <div class="d-flex align-items-center justify-content-between mb-4">
-      <div>
-        <h1 class="h3 mb-1">{{ collectionsStore.sortedCollections.length || 0 }} Bộ sưu tập</h1>
-        <p class="text-muted mb-0">Chọn một bộ sưu tập để bắt đầu học hoặc quản lý từ vựng.</p>
+    <!-- Page header (§12): h3 count left, the screen's single primary CTA right.
+         Stacks on phones (§5.1) so the CTA is a full-width touch target. -->
+    <header
+      class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-sm-between gap-3 mb-4"
+    >
+      <div class="min-width-0">
+        <h1 class="h3 mb-1">
+          {{ collectionsStore.sortedCollections.length }} Bộ sưu tập
+        </h1>
+        <p class="text-muted small mb-0">
+          Chọn một bộ sưu tập để bắt đầu học hoặc quản lý từ vựng.
+        </p>
       </div>
-      <button type="button" class="btn btn-primary" @click="openCreate">
-        + Thêm bộ sưu tập
-      </button>
-    </div>
+      <div class="d-grid d-sm-block">
+        <button type="button" class="btn btn-primary" @click="openCreate">
+          + Thêm bộ sưu tập
+        </button>
+      </div>
+    </header>
 
-    <!-- Loading -->
-    <div v-if="collectionsStore.fetchState === 'loading'" class="py-5">
+    <!-- Loading (§11.1) -->
+    <div v-if="collectionsStore.fetchState === 'loading'">
       <AppSpinner label="Đang tải bộ sưu tập..." />
     </div>
 
-    <!-- Error -->
+    <!-- Error (§11.2): short message + root cause + retry -->
     <div
       v-else-if="collectionsStore.fetchState === 'error'"
-      class="text-center text-muted border rounded py-5"
+      class="home-state text-center py-5 px-3"
+      role="alert"
     >
-      <p class="mb-0 fs-5">Không thể tải danh sách bộ sưu tập.</p>
-      <button type="button" class="btn btn-outline-primary mt-3" @click="loadCollections">
+      <p class="fs-5 mb-1">Không thể tải danh sách bộ sưu tập.</p>
+      <p v-if="collectionsStore.fetchError" class="small text-danger mb-0">
+        {{ collectionsStore.fetchError }}
+      </p>
+      <button
+        type="button"
+        class="btn btn-outline-primary mt-3"
+        @click="loadCollections"
+      >
         Thử lại
       </button>
     </div>
 
-    <!-- Empty -->
+    <!-- Empty (§11.3): explain + the action that fixes it.
+         Outline (not solid) — the header CTA stays the single primary (P8). -->
     <div
       v-else-if="collectionsStore.sortedCollections.length === 0"
-      class="text-center text-muted border rounded py-5"
+      class="home-state text-center py-5 px-3"
     >
-      <p class="mb-0 fs-5">Chưa có bộ sưu tập nào.</p>
-      <p class="small mb-0">Bấm "+ Thêm bộ sưu tập" để bắt đầu.</p>
+      <p class="fs-5 mb-1">Chưa có bộ sưu tập nào.</p>
+      <p class="small text-muted mb-3">
+        Tạo bộ sưu tập đầu tiên để bắt đầu học từ vựng.
+      </p>
+      <button type="button" class="btn btn-outline-primary" @click="openCreate">
+        + Thêm bộ sưu tập
+      </button>
     </div>
 
-    <!-- Grid (A→Z via sortedCollections getter) -->
+    <!-- Grid (§12): row g-3 + col-12 col-sm-6 col-lg-4, A→Z via sortedCollections -->
     <div v-else class="row g-3">
       <div
         v-for="collection in collectionsStore.sortedCollections"
@@ -185,3 +209,18 @@ function goWords(id) {
     />
   </section>
 </template>
+
+<style scoped>
+/* State panels (error/empty) rest on one surface card (§3.3, §7.9). */
+.home-state {
+  background-color: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 0.9rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+/* Shrinkable flex children need min-width: 0 for truncation (§3.2). */
+.min-width-0 {
+  min-width: 0;
+}
+</style>
