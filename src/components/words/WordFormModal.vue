@@ -33,6 +33,11 @@ const props = defineProps({
     required: true,
     // { type: string[], topic: string[], level: string[] }
   },
+   /** Active collection (BR-26): preselected when creating a new word. */
+   defaultCollectionId: {
+     type: String,
+     default: '',
+   },
 })
 
 const emit = defineEmits(['submit', 'close', 'clear-error'])
@@ -60,7 +65,9 @@ watch(
 )
 
 function reset() {
-  form.collectionId = props.word?.collectionId ?? ''
+  // BR-26: on create, collectionId defaults to the active collection
+  // (`defaultCollectionId`); on edit it stays the word's own collection.
+  form.collectionId = props.word?.collectionId ?? props.defaultCollectionId
   form.word = props.word?.word ?? ''
   form.transcription = props.word?.transcription ?? ''
   form.meaning = props.word?.meaning ?? ''

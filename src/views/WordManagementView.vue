@@ -154,17 +154,23 @@ async function requestDelete(id) {
 
 <template>
   <section class="word-management-view">
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <div>
-        <h1 class="h3 mb-1">{{ collection?.name || 'Từ vựng' }}</h1>
-        <p class="text-muted mb-0">
+    <!-- Page header (§12): collection name + counts left, single primary CTA
+         right. Stacks on phones (§5.1) with a full-width touch target. -->
+    <header
+      class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-sm-between gap-3 mb-4"
+    >
+      <div class="min-width-0">
+        <h1 class="h3 mb-1 text-truncate">{{ collection?.name || 'Từ vựng' }}</h1>
+        <p class="text-muted small mb-0">
           {{ words.length }} từ vựng · hiển thị {{ visibleWords.length }}
         </p>
       </div>
-      <button type="button" class="btn btn-primary" @click="openCreate">
-        + Thêm từ vựng
-      </button>
-    </div>
+      <div class="d-grid d-sm-block">
+        <button type="button" class="btn btn-primary" @click="openCreate">
+          + Thêm từ vựng
+        </button>
+      </div>
+    </header>
 
     <!-- Loading -->
     <AppSpinner v-if="fetchState === 'loading'" label="Đang tải từ vựng..." />
@@ -205,9 +211,7 @@ async function requestDelete(id) {
               <th scope="col">Từ</th>
               <th scope="col">Phiên âm</th>
               <th scope="col">Nghĩa</th>
-              <th scope="col" class="d-none d-md-table-cell">Ví dụ</th>
               <th scope="col" class="d-none d-lg-table-cell">Phân loại</th>
-              <th scope="col" class="d-none d-xl-table-cell">Ngày tạo</th>
               <th scope="col" class="text-end">Thao tác</th>
             </tr>
           </thead>
@@ -232,9 +236,35 @@ async function requestDelete(id) {
       :busy="busy"
       :errors="modalErrors"
       :options="filterOptions"
+      :default-collection-id="collectionId"
       @submit="handleSubmit"
       @close="closeModal"
       @clear-error="clearFieldError"
     />
   </section>
 </template>
+
+<style scoped>
+/* State panels (error/empty/filtered-empty) — same surface as Home (§3.3). */
+.state-panel {
+  background-color: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 0.9rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+/* List surface: hairline border + soft shadow; rounded corners clip the
+   table so the header band and last row follow the radius (§7.5). */
+.list-panel {
+  background-color: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 0.9rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+/* Shrinkable flex children need min-width: 0 for truncation (§3.2). */
+.min-width-0 {
+  min-width: 0;
+}
+</style>

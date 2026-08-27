@@ -370,8 +370,9 @@ for non-critical dialogs).
 
 - **Selection lists** (Word Selection): `list-group` rows + checkbox, left
   text truncated, right meta badges.
-- **Management lists** (Word Management): `table-responsive` table with
-  progressive column disclosure (`d-none d-md-table-cell` etc.) + row actions.
+- **Management lists** (Word Management): `table-responsive` table with a fixed
+  five-column layout — **Từ · Phiên âm · Nghĩa · Danh mục (type/topic/level
+  badges) · Thao tác** (44px icon buttons) — inside the `.list-panel` surface.
 - Both must reuse `FilterBar` for search/filter parity.
 
 ### 7.9 Feedback & states
