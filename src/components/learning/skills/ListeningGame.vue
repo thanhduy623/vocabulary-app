@@ -16,6 +16,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useLearningStore } from '@/stores/learningStore'
 import { speak, stopSpeaking } from '@/services/speech'
 import ProgressStats from '@/components/learning/ProgressStats.vue'
+import VocabularyDetailModal from '@/components/learning/VocabularyDetailModal.vue'
 
 const emit = defineEmits(['completed'])
 
@@ -30,6 +31,30 @@ const selectedIndex = ref(null)
 const wasCorrect = ref(false)
 /** Set while the last TTS attempt failed so the UI can hint (AMB-12). */
 const speechUnavailable = ref(false)
+
+/** Pending auto-advance timer set after a CORRECT pick. */
+let advanceTimer = null
+/** Delay (ms) after a correct answer before auto-advancing. */
+const AUTO_ADVANCE_DELAY = 1400
+
+/** Whether the wrong-answer detail modal is currently open. */
+const showDetail = ref(false)
+
+/** Full source word for the detail modal. */
+const sourceWord = computed(
+  () =>
+    (store.learningSession?.words ?? []).find(
+      (w) => w.id === item.value?.sourceWordId,
+    ) ?? null,
+)
+
+/** Clear any pending auto-advance timer. */
+function clearAdvanceTimer() {
+  if (advanceTimer) {
+    clearTimeout(advanceTimer)
+    advanceTimer = null
+  }
+}
 
 const options = computed(() => item.value?.payload?.options ?? [])
 const correctIndex = computed(() =>
@@ -64,8 +89,10 @@ function replayAudio() {
 watch(
   () => item.value?.id,
   () => {
+    clearAdvanceTimer()
     selectedIndex.value = null
     wasCorrect.value = false
+    showDetail.value = false
     speakCurrent()
   },
   { immediate: true },
@@ -76,16 +103,40 @@ function pick(index) {
   if (!item.value || answered.value) return
   selectedIndex.value = index
   wasCorrect.value = index === correctIndex.value
+  // Reinforce the word pronunciation after the choice.
+  speakCurrent()
+
+  if (wasCorrect.value) {
+    // Correct → brief pause for the green highlight, then auto-advance.
+    clearAdvanceTimer()
+    advanceTimer = setTimeout(() => {
+      advanceTimer = null
+      next()
+    }, AUTO_ADVANCE_DELAY)
+  } else {
+    // Wrong → reveal correct answer (green) + show study card; wait for user.
+    showDetail.value = true
+  }
 }
 
-/** Commit the chosen answer to the engine and move on. */
+/**
+ * Commit the answer to the engine and advance. Correct answers master the
+ * item; wrong answers are re-queued randomly (engine submitAnswer) so the
+ * item reappears later.
+ */
 function next() {
   if (!item.value || !answered.value) return
   const option = options.value[selectedIndex.value]
   const result = store.answerActive({ option })
   selectedIndex.value = null
   wasCorrect.value = false
+  showDetail.value = false
   if (result?.skillCompleted) emit('completed')
+}
+
+/** "Đã học" modal button — advance (re-queues a wrong item). */
+function onLearned() {
+  next()
 }
 
 /** CSS classes for each option (locked feedback once answered). */
@@ -97,7 +148,7 @@ function optionClass(index) {
   return `${base} is-dimmed`
 }
 
-// --- keyboard: 1–4 pick, Enter goes next, R replays -------------------------
+// --- keyboard: 1–4 pick, R replays ------------------------------------------
 function onKeydown(event) {
   const tag = event.target?.tagName
   if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
@@ -110,11 +161,6 @@ function onKeydown(event) {
     pick(num - 1)
     return
   }
-  if (event.key === 'Enter' && answered.value) {
-    event.preventDefault()
-    next()
-    return
-  }
   if (event.key === 'r' || event.key === 'R') {
     event.preventDefault()
     replayAudio()
@@ -125,6 +171,7 @@ onMounted(() => window.addEventListener('keydown', onKeydown))
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   stopSpeaking()
+  clearAdvanceTimer()
 })
 
 // Notify parent immediately when this skill is already finished.
@@ -178,24 +225,16 @@ if (store.isSkillCompletedNow) emit('completed')
         :class="wasCorrect ? 'text-success' : 'text-danger'"
         role="status"
       >
-        <template v-if="wasCorrect">Chính xác ✓</template>
-        <template v-else>
-          Sai rồi — đáp án đúng được tô <span class="fw-semibold">xanh</span>.
-        </template>
-      </div>
-
-      <div class="d-flex justify-content-between align-items-center mt-3">
-        <small class="text-muted">Phím: 1–4 chọn · R nghe lại · Enter tiếp theo</small>
-        <button
-          type="button"
-          class="btn btn-primary"
-          :class="{ 'visually-hidden': !answered }"
-          @click="next"
-        >
-          Tiếp theo →
-        </button>
       </div>
     </div>
+
+    <!-- Wrong answer: study card with full details; only "Đã học" advances -->
+    <VocabularyDetailModal
+      v-if="showDetail"
+      :word="sourceWord"
+      :was-correct="false"
+      @learned="onLearned"
+    />
   </div>
 </template>
 

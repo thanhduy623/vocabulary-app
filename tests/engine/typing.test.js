@@ -17,6 +17,27 @@ describe('TYPING generation (BR-50)', () => {
     }
   })
 
+  it('filters templates by mode: transcription-mode only gõ phiên âm', () => {
+    const words = freshWords()
+    const items = typing.generate(words, {
+      rng: createRng(99),
+      mode: 'transcription',
+    })
+    const templates = new Set(items.map((i) => i.template))
+    expect(templates.has('type-word-transcription')).toBe(true)
+    expect(templates.has('type-transcription-word')).toBe(false)
+    expect(templates.has('type-meaning-word')).toBe(false)
+  })
+
+  it('filters by word-mode: answered field is always the word', () => {
+    const words = freshWords()
+    const items = typing.generate(words, { rng: createRng(100), mode: 'word' })
+    const templates = new Set(items.map((i) => i.template))
+    expect(templates.has('type-transcription-word')).toBe(true)
+    expect(templates.has('type-meaning-word')).toBe(true)
+    expect(templates.has('type-word-transcription')).toBe(false)
+  })
+
   it('skips templates whose key or target is blank (AMB-8)', () => {
     const words = [{ ...freshWords()[0], transcription: '' }]
     const templates = typing

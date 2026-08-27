@@ -90,19 +90,27 @@ export function createLearningSession({
 /**
  * Forget a skill's process: regenerate its plan from scratch (fresh shuffle,
  * zeroed counters, status back to pending). Used when the learner backs out
- * of a skill or wants to re-study an already completed one.
+ * of a skill, wants to re-study an already completed one, or (for mode-based
+ * skills like TYPING) picks a different practice mode (e.g. word vs
+ * transcription).
  *
  * @param {Object} session
  * @param {string} skillId
+ * @param {Object} [generateOptions]  extra options forwarded to skill.generate
+ *                                    (e.g. { mode } for TYPING)
  * @returns {Object} the reset plan
  */
-export function resetSkill(session, skillId) {
+export function resetSkill(session, skillId, generateOptions = {}) {
   const plan = requirePlan(session, skillId)
   const skill = getSkill(skillId)
   const rng = createRng(resolveSeed(null)) // fresh randomness per reset
 
   const items = shuffle(
-    skill.generate(session.words ?? [], { rng, lang: session.lang }),
+    skill.generate(session.words ?? [], {
+      rng,
+      lang: session.lang,
+      ...generateOptions,
+    }),
     rng,
   )
 

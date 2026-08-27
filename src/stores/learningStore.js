@@ -188,6 +188,24 @@ export const useLearningStore = defineStore('learning', {
     },
 
     /**
+     * Start the TYPING skill with a chosen practice mode. The mode decides the
+     * question direction (what the learner types): 'word' or 'transcription'.
+     * The TYPING plan is regenerated for that mode (fresh shuffle, zeroed
+     * counters) and becomes active immediately.
+     * @param {'word'|'transcription'} mode
+     */
+    startTypingMode(mode) {
+      if (!this.learningSession) return false
+      if (!this.learningSession.selectedSkillOrder.includes(engine.SKILL_IDS.TYPING)) {
+        return false
+      }
+      engine.resetSkill(this.learningSession, engine.SKILL_IDS.TYPING, { mode })
+      engine.beginSkill(this.learningSession, engine.SKILL_IDS.TYPING)
+      this.activeSkillId = engine.SKILL_IDS.TYPING
+      return true
+    },
+
+    /**
      * Submit an answer for the active skill's current item and mirror the
      * completion into completedSkillIds (BR-63).
      * @param {Object} answer

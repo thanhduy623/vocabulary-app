@@ -28,15 +28,38 @@ const TEMPLATES = Object.freeze([
 ])
 
 /**
+ * Practice modes — the learner chooses WHAT to type.
+ *   word        → prompts whose ANSWER is the WORD (transcription → word, meaning → word)
+ *   transcription → prompts whose ANSWER is the TRANSCRIPTION (word → transcription)
+ * null/omitted → all templates (default, used by tests / non-mode callers).
+ */
+export const TYPING_MODE = Object.freeze({
+  WORD: 'word',
+  TRANSCRIPTION: 'transcription',
+})
+
+/**
+ * Templates whose ANSWER field matches the requested mode.
+ * @param {string|null} mode
+ * @returns {[string, string][]}
+ */
+function templatesForMode(mode) {
+  if (!mode) return TEMPLATES
+  return TEMPLATES.filter(([, targetField]) => targetField === mode)
+}
+
+/**
  * Generate typing items.
  * @param {Object[]} words
- * @param {{rng: () => number, lang?: string}} ctx
+ * @param {{rng: () => number, lang?: string, mode?: string|null}} ctx
+ *   ctx.mode filters templates to a single typing direction (see TYPING_MODE).
  */
-export function generate(words) {
+export function generate(words, ctx = {}) {
   const items = []
+  const templates = templatesForMode(ctx?.mode)
 
   for (const w of words) {
-    for (const [keyField, targetField] of TEMPLATES) {
+    for (const [keyField, targetField] of templates) {
       const prompt = String(w[keyField] ?? '').trim()
       const expected = String(w[targetField] ?? '').trim()
       if (!prompt || !expected) continue

@@ -61,17 +61,17 @@ function speakAudio() {
   speechUnavailable.value = !res.ok
 }
 
-// --- keyboard: Enter / Space flip ------------------------------------------
-// Skip when the event target is an interactive control (e.g. a button on the
-// card's back face) so Space/Enter keep their native activation behavior.
-
+// --- keyboard: Enter / Space -----------------------------------------------
+// Front face → flip to the back. Back face → advance to the next card and
+// mark it learned (exactly like "Đã nhớ"). Advances only when the card is
+// already revealed; it never skips a card while the front is showing.
 function onKeydown(event) {
-  const tag = event.target?.tagName
-  if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-    return
-  }
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault()
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  event.preventDefault()
+  if (!item.value) return
+  if (isFlipped.value) {
+    remember()
+  } else {
     flip()
   }
 }
@@ -116,7 +116,7 @@ if (store.isSkillCompletedNow) emit('completed')
             {{ item.payload.front }}
           </p>
           <small class="text-muted mt-4">
-            Nhấp / Enter / Space để lật thẻ
+            Nhấp hoặc Enter / Space để lật thẻ
           </small>
         </div>
 
@@ -124,7 +124,7 @@ if (store.isSkillCompletedNow) emit('completed')
         <div class="fc-face fc-back d-flex flex-column justify-content-center p-4">
           <span class="badge text-bg-dark mb-3 align-self-center">BACK</span>
 
-          <p v-if="item.payload.detail.word" class="h4 text-center mb-1">
+          <p v-if="item.payload.detail.word" class="display-3 fw-bold text-center mb-1">
             {{ item.payload.detail.word }}
           </p>
 
@@ -200,7 +200,7 @@ if (store.isSkillCompletedNow) emit('completed')
 .fc-card {
   position: relative;
   width: 100%;
-  min-height: min(65dvh, 560px);
+  min-height: min(60dvh, 560px);
   transform-style: preserve-3d;
   transition: transform 0.45s ease;
 }
