@@ -15,6 +15,7 @@ import { useLearningStore } from '@/stores/learningStore'
 import { speak, stopSpeaking } from '@/services/speech'
 import { getSkill } from '@/engine'
 import ProgressStats from '@/components/learning/ProgressStats.vue'
+import AudioPlayButton from '@/components/learning/AudioPlayButton.vue'
 import VocabularyDetailModal from '@/components/learning/VocabularyDetailModal.vue'
 
 const emit = defineEmits(['completed'])
@@ -34,11 +35,13 @@ const MODE_OPTIONS = [
     id: 'transcription',
     label: 'Luyện phiên âm',
     description: 'Hiện từ tiếng Anh / nghĩa → bạn gõ phiên âm.',
+    glyph: '/ə/',
   },
   {
     id: 'word',
     label: 'Luyện từ',
     description: 'Hiện phiên âm / nghĩa → bạn gõ từ tiếng Anh.',
+    glyph: 'Aa',
   },
 ]
 
@@ -115,6 +118,9 @@ const targetLabel = computed(
 /** Uppercase variant for the "Gõ: TỪ / PHIÊN ÂM" badge. */
 const targetLabelUpper = computed(() => targetLabel.value.toUpperCase())
 
+/** Transcription targets (IPA) render in the data monospace style (§3.2). */
+const isTranscriptionTarget = computed(() => targetLabel.value === 'phiên âm')
+
 /** Dynamic input placeholder: "Gõ phiên âm tại đây…" / "Gõ từ tại đây…" */
 const placeholderText = computed(() => `Gõ ${targetLabel.value} tại đây…`)
 
@@ -156,9 +162,22 @@ watch(
 
 /** Pick the practice mode and (re)start the typing skill for it. */
 function selectMode(chosen) {
-  if (store.startTypingMode(chosen)) {
-    mode.value = chosen
-  }
+  if (!store.startTypingMode(chosen)) return
+  // A (re)started plan always begins fresh — clear any in-flight answer state
+  // so the panel never shows stale feedback from the previous mode.
+  clearAdvanceTimer()
+  typedValue.value = ''
+  submittedValue.value = ''
+  submitted.value = false
+  wasCorrect.value = false
+  showDetail.value = false
+  mode.value = chosen
+}
+
+/** Back to the mode picker (convenience). The plan restarts on re-pick. */
+function changeMode() {
+  clearAdvanceTimer()
+  mode.value = null
 }
 
 /** Check the typed answer: lock input, show feedback, then drive advance. */
@@ -217,8 +236,8 @@ if (store.isSkillCompletedNow) emit('completed')
 
     <!-- MODE PICKER: choose what to type before practice starts -->
     <div v-if="showModePicker" class="type-picker mx-auto my-2">
-      <h2 class="h5 text-center mb-2">Chọn chế độ luyện gõ</h2>
-      <p class="text-muted small text-center mb-3">Chọn loại bạn muốn gõ để bắt đầu.</p>
+      <p class="type-eyebrow">Luyện gõ</p>
+      <h2 class="h4 text-center mb-4">Bạn muốn gõ gì?</h2>
 
       <div class="row g-3">
         <div v-for="opt in MODE_OPTIONS" :key="opt.id" class="col-12 col-sm-6">
@@ -227,43 +246,56 @@ if (store.isSkillCompletedNow) emit('completed')
             class="card h-100 w-100 border text-start p-3 type-mode-card"
             @click="selectMode(opt.id)"
           >
-            <div class="fw-semibold mb-1">{{ opt.label }}</div>
-            <div class="small text-muted">{{ opt.description }}</div>
+            <div class="d-flex align-items-center gap-3">
+              <span class="type-mode-icon" aria-hidden="true">{{ opt.glyph }}</span>
+              <div class="min-w-0">
+                <div class="fw-semibold mb-1">{{ opt.label }}</div>
+                <div class="small text-muted">{{ opt.description }}</div>
+              </div>
+            </div>
           </button>
         </div>
       </div>
+
+      <p class="text-muted small text-center mt-3 mb-0">
+        Bạn có thể đổi chế độ bất cứ lúc nào bằng nút "Đổi chế độ".
+      </p>
     </div>
 
     <!-- QUESTION MODE -->
     <template v-else>
       <div v-if="item" class="type-panel mx-auto my-1">
-        <!-- Question type → answer type hint -->
-        <div class="type-head" role="group" aria-label="Loại câu hỏi">
-          <span class="badge type-badge-key">{{ questionLabel }}</span>
-          <span class="type-arrow" aria-hidden="true">→</span>
-          <span class="badge type-badge-answer">Gõ: {{ targetLabelUpper }}</span>
-          <button
-            type="button"
-            class="btn btn-sm btn-outline-primary type-replay"
-            :title="speechUnavailable ? 'Thiết bị không hỗ trợ đọc phát âm' : 'Nghe lại'"
-            aria-label="Nghe lại phát âm"
-            @click="replayAudio"
-          >
-            🔊 Nghe
-          </button>
+        <!-- Shared uniform audio button, corner-pinned like the flashcard -->
+        <AudioPlayButton
+          class="type-speak position-absolute"
+          variant="icon"
+          aria-label="Nghe lại"
+          :unavailable="speechUnavailable"
+          @play="replayAudio"
+        />
+
+        <p v-if="speechUnavailable" class="text-warning small text-center mb-2">
+          Thiết bị không hỗ trợ đọc phát âm.
+        </p>
+
+        <!-- Question kind reads as metadata; the prompt itself is the hero -->
+        <p class="type-eyebrow">{{ questionLabel }}</p>
+
+        <div class="type-prompt-zone">
+          <p class="type-prompt" :class="{ 'is-mono': isTranscriptionTarget }">
+            {{ item.payload.prompt }}
+          </p>
         </div>
 
-        <!-- The prompt (the "key" shown to the learner) -->
-        <p class="type-prompt">{{ item.payload.prompt }}</p>
-
-        <!-- Targeted input -->
+        <!-- Targeted input; the floating chip restates what to type -->
         <div class="type-input-row">
+          <span class="type-target-chip">Gõ: {{ targetLabelUpper }}</span>
           <input
             ref="inputEl"
             v-model="typedValue"
             type="text"
             class="form-control form-control-lg type-input"
-            :class="feedbackClass"
+            :class="[feedbackClass, { 'is-mono': isTranscriptionTarget }]"
             :disabled="submitted"
             :readonly="submitted"
             :aria-invalid="submitted && !wasCorrect"
@@ -273,9 +305,20 @@ if (store.isSkillCompletedNow) emit('completed')
             :placeholder="placeholderText"
             @keydown.enter.prevent="onInputEnter"
           />
+          <span
+            v-if="submitted"
+            class="type-input-mark"
+            :class="wasCorrect ? 'is-correct' : 'is-wrong'"
+            aria-hidden="true"
+          >
+            {{ wasCorrect ? '✓' : '✗' }}
+          </span>
+          <small v-if="!submitted" class="type-enter-hint text-muted">
+            Enter để kiểm tra
+          </small>
         </div>
 
-        <!-- Feedback -->
+        <!-- Feedback (§7.3) -->
         <div
           v-if="submitted"
           class="type-feedback"
@@ -284,14 +327,22 @@ if (store.isSkillCompletedNow) emit('completed')
         >
           <template v-if="wasCorrect">Chính xác ✓ — tiếp tục tự động…</template>
           <template v-else>
-            Sai rồi — {{ targetLabel }} đúng:
-            <span class="fw-semibold">{{ item.payload.expected }}</span>
+            ✗ Chưa đúng — {{ targetLabel }} đúng:
+            <strong class="type-expected">{{ item.payload.expected }}</strong>
           </template>
         </div>
 
-        <!-- Actions: only "Kiểm tra" (advance is automatic or via modal) -->
+        <!-- Actions: Kiểm tra while answering; Tiếp theo skips the
+             auto-advance wait (next() already clears the timer) -->
         <div class="d-flex justify-content-between align-items-center mt-3 type-actions">
-          <small class="text-muted">Enter để kiểm tra</small>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            title="Đổi chế độ — tiến trình luyện gõ sẽ bắt đầu lại"
+            @click="changeMode"
+          >
+            Đổi chế độ
+          </button>
           <button
             v-if="!submitted"
             type="button"
@@ -300,6 +351,15 @@ if (store.isSkillCompletedNow) emit('completed')
             @click="check"
           >
             Kiểm tra
+          </button>
+          <button
+            v-else-if="wasCorrect"
+            type="button"
+            class="btn btn-primary"
+            @click="next"
+          >
+            Tiếp theo
+            <span aria-hidden="true">&rarr;</span>
           </button>
         </div>
       </div>
@@ -320,90 +380,221 @@ if (store.isSkillCompletedNow) emit('completed')
   width: min(560px, 100%);
 }
 
+/* Mode cards: same interactive-card language as the skill picker (§7.5). */
 .type-mode-card {
-  transition:
-    transform 0.1s ease,
-    box-shadow 0.1s ease;
-}
-.type-mode-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.type-panel {
-  width: min(560px, 100%);
-  padding: 1.25rem;
-  border: 1px solid var(--bs-border-color);
+  cursor: pointer;
   border-radius: 0.9rem;
-  background-color: var(--bs-body-bg, #fff);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+  background-color: var(--app-surface);
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
-.type-head {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.25rem;
+/* Hover/focus lift (§3.3 level 2) + brand ring. */
+.type-mode-card:hover,
+.type-mode-card:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(var(--app-brand-rgb), 0.45);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    0 0 0 3px rgba(var(--app-brand-rgb), 0.12);
 }
 
-.type-badge-key {
-  font-size: 0.9rem;
-  padding: 0.45em 0.8em;
-}
-
-.type-badge-answer {
-  font-size: 0.9rem;
+/* Brand-gradient tile matching the skill-selection icon language (§7.1). */
+.type-mode-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 0.9rem;
+  background: linear-gradient(
+    135deg,
+    var(--app-brand),
+    rgba(var(--app-brand-rgb), 0.72)
+  );
+  color: var(--app-brand-contrast);
   font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  box-shadow: 0 6px 18px rgba(var(--app-brand-rgb), 0.35);
+}
+
+/* Shrinkable flex children need min-width: 0 (§3.2). */
+.min-w-0 {
+  min-width: 0;
+}
+
+/* Focus panel (§5.3) — shared card surface + entrance animation (§8). */
+.type-panel {
+  position: relative;
+  width: min(640px, 100%);
+  padding: 1.5rem 1.25rem 1.25rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.9rem;
+  background-color: var(--app-surface);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  animation: type-panel-in 200ms ease-out;
+}
+
+@keyframes type-panel-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Corner-pinned shared audio button — same placement as the flashcard. */
+.type-speak {
+  top: 0.75rem;
+  right: 0.75rem;
+}
+
+/* Eyebrow: question kind reads as metadata (§3.2). */
+.type-eyebrow {
+  text-align: center;
   text-transform: uppercase;
-  background-color: var(--bs-primary);
-  color: #fff;
-  padding: 0.45em 0.8em;
+  letter-spacing: 0.06em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--app-text-muted);
+  margin-bottom: 0.75rem;
 }
 
-.type-arrow {
-  color: var(--bs-secondary);
-  font-weight: 700;
+/* Prompt zone: brand-tinted stage — the flashcard's "alive" card language
+   (P7); the prompt is the hero content at the documented scale (§3.2). */
+.type-prompt-zone {
+  padding: 1.75rem 1.25rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  border: 1px solid var(--app-border);
+  border-radius: 0.9rem;
+  background: linear-gradient(
+    135deg,
+    rgba(var(--app-brand-rgb), 0.07),
+    var(--app-surface) 60%
+  );
 }
 
 .type-prompt {
-  font-size: 1.35rem;
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2rem);
   font-weight: 600;
-  text-align: center;
   overflow-wrap: anywhere;
-  margin-bottom: 1.25rem;
-  min-height: 1.5em;
 }
 
+/* IPA and other transcriptions read as data — system monospace (§3.2). */
+.is-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace;
+}
+
+/* Input row: floating target chip + result mark inside the field. */
 .type-input-row {
-  margin-bottom: 1rem;
+  position: relative;
+  margin-bottom: 0.25rem;
+}
+
+.type-target-chip {
+  position: absolute;
+  top: -0.7rem;
+  left: 0.75rem;
+  z-index: 2;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid rgba(var(--app-brand-rgb), 0.35);
+  border-radius: 0.375rem;
+  background-color: rgba(var(--app-brand-rgb), 0.08);
+  color: var(--app-brand);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  pointer-events: none;
 }
 
 .type-input {
   text-align: center;
-  font-size: 1.15rem;
+  font-size: 1.2rem;
+  /* Keep typed text clear of the ✓/✗ mark. */
+  padding-right: 2.5rem;
   transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
 }
 
 .type-input.is-correct {
   border-color: var(--bs-success);
-  background-color: var(--bs-success-bg-subtle, #d1e7dd);
+  background-color: rgba(var(--bs-success-rgb), 0.1);
   color: var(--bs-success);
-  box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.15);
+  box-shadow: 0 0 0 0.25rem rgba(var(--bs-success-rgb), 0.15);
 }
 
 .type-input.is-wrong {
   border-color: var(--bs-danger);
-  background-color: var(--bs-danger-bg-subtle, #f8d7da);
+  background-color: rgba(var(--bs-danger-rgb), 0.1);
   color: var(--bs-danger);
-  box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.15);
+  box-shadow: 0 0 0 0.25rem rgba(var(--bs-danger-rgb), 0.15);
+}
+
+.type-input-mark {
+  position: absolute;
+  top: 1.2rem;
+  right: 0.9rem;
+  font-weight: 800;
+  font-size: 1.25rem;
+  animation: type-mark-pop 150ms ease-out;
+}
+
+.type-input-mark.is-correct {
+  color: var(--bs-success);
+}
+
+.type-input-mark.is-wrong {
+  color: var(--bs-danger);
+}
+
+@keyframes type-mark-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.type-enter-hint {
+  display: block;
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+.type-expected {
+  overflow-wrap: anywhere;
 }
 
 .type-feedback {
   text-align: center;
   font-size: 1rem;
   font-weight: 500;
+}
+
+/* P10 / §8.4 — remove non-essential motion. */
+@media (prefers-reduced-motion: reduce) {
+  .type-mode-card,
+  .type-mode-card:hover,
+  .type-mode-card:focus-visible {
+    transform: none;
+    transition: none;
+  }
+
+  .type-panel,
+  .type-input-mark {
+    animation: none;
+  }
 }
 </style>

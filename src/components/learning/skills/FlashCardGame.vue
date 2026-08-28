@@ -14,6 +14,7 @@ import { useLearningStore } from '@/stores/learningStore'
 import { speak } from '@/services/speech'
 import { FLASH_CARD_ACTIONS } from '@/engine'
 import ProgressStats from '@/components/learning/ProgressStats.vue'
+import AudioPlayButton from '@/components/learning/AudioPlayButton.vue'
 
 const emit = defineEmits(['completed'])
 
@@ -67,6 +68,15 @@ function speakAudio() {
 // already revealed; it never skips a card while the front is showing.
 function onKeydown(event) {
   if (event.key !== 'Enter' && event.key !== ' ') return
+  // Don't hijack keys pressed on other interactive controls (speaker /
+  // action buttons) — Space on 🔊 must not ALSO flip the card (§10).
+  const target = event.target
+  if (
+    target instanceof Element &&
+    target.closest('button, a, input, select, textarea')
+  ) {
+    return
+  }
   event.preventDefault()
   if (!item.value) return
   if (isFlipped.value) {
@@ -93,25 +103,24 @@ if (store.isSkillCompletedNow) emit('completed')
       class="fc-scene mx-auto my-1"
       role="button"
       tabindex="0"
-      aria-label="Thẻ nhớ — nhấp để lật"
+      :aria-label="isFlipped ? 'Thẻ nhớ — nhấp để xem tiếp' : 'Thẻ nhớ — nhấp để lật'"
       @click="flip"
     >
-      <!-- 🔊 pinned top-right, works on both faces -->
-      <button
-        type="button"
-        class="btn btn-lg fs-3 fc-speak position-absolute"
-        :disabled="speechUnavailable"
-        :title="speechUnavailable ? 'Thiết bị không hỗ trợ đọc phát âm' : 'Phát âm'"
+      <!-- 🔊 shared AudioPlayButton (§7.1), pinned top-right on both faces.
+           Parent owns speak(); the component stops click propagation so the
+           card underneath doesn't flip. -->
+      <AudioPlayButton
+        class="fc-speak position-absolute"
+        variant="icon"
         aria-label="Phát âm"
-        @click.stop="speakAudio"
-      >
-        🔊
-      </button>
+        :unavailable="speechUnavailable"
+        @play="speakAudio"
+      />
 
       <div class="fc-card" :class="{ 'is-flipped': isFlipped }" >
         <!-- FRONT -->
         <div class="fc-face fc-front d-flex flex-column justify-content-center align-items-center p-4">
-          <span class="badge text-bg-light mb-3">FRONT</span>
+          <span class="badge text-bg-light mb-3">Mặt trước</span>
           <p class="fc-text display-5 fw-semibold text-center m-0">
             {{ item.payload.front }}
           </p>
@@ -122,15 +131,15 @@ if (store.isSkillCompletedNow) emit('completed')
 
         <!-- BACK -->
         <div class="fc-face fc-back d-flex flex-column justify-content-center p-4">
-          <span class="badge text-bg-dark mb-3 align-self-center">BACK</span>
+          <span class="badge text-bg-light mb-3 align-self-center">Mặt sau</span>
 
-          <p v-if="item.payload.detail.word" class="display-3 fw-bold text-center mb-1">
+          <p v-if="item.payload.detail.word" class="display-5 fw-semibold text-center mb-1">
             {{ item.payload.detail.word }}
           </p>
 
           <p
             v-if="item.payload.detail.transcription"
-            class="text-center text-muted mb-2"
+            class="text-center text-muted fc-mono mb-2"
           >
             {{ item.payload.detail.transcription }}
           </p>
@@ -183,14 +192,25 @@ if (store.isSkillCompletedNow) emit('completed')
 </template>
 
 <style scoped>
-
+/* ---------------------------------------------------------------
+   Scene: centered focus column (§5.3, width min(640px, 100%)).
+   Focus indicator is an explicit brand ring — never bare
+   outline: none (§10).
+   --------------------------------------------------------------- */
 .fc-scene {
   width: min(640px, 100%);
   perspective: 1200px;
   cursor: pointer;
   outline: none;
+  border-radius: 0.9rem;
 }
 
+.fc-scene:focus-visible {
+  box-shadow: 0 0 0 3px rgba(var(--app-brand-rgb), 0.35);
+}
+
+/* Shared AudioPlayButton (§7.1): only the corner position lives here —
+   geometry, hover and disabled styling belong to the component. */
 .fc-speak {
   top: 0.5rem;
   right: 0.5rem;
@@ -209,16 +229,27 @@ if (store.isSkillCompletedNow) emit('completed')
   transform: rotateY(180deg);
 }
 
+/* Faces: token-only surface + hairline border + rest shadow (§3.3). */
 .fc-face {
   position: absolute;
   inset: 0;
-  border-radius: 0.75rem;
-  border: 1px solid var(--bs-border-color);
-  background-color: var(--bs-body-bg, #fff);
+  border-radius: 0.9rem;
+  border: 1px solid var(--app-border);
+  background-color: var(--app-surface);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
   overflow-y: auto;
+}
+
+/* Front: subtle brand tint — same "alive" card language as
+   CollectionCard's hero (P7), still flat and quiet. */
+.fc-front {
+  background: linear-gradient(
+    135deg,
+    rgba(var(--app-brand-rgb), 0.07),
+    var(--app-surface) 55%
+  );
 }
 
 .fc-back {
@@ -227,12 +258,31 @@ if (store.isSkillCompletedNow) emit('completed')
   padding-bottom: max(1.5rem, calc(0.75rem + env(safe-area-inset-bottom)));
 }
 
-/* Actions wrap on narrow portrait screens so both buttons stay tappable. */
+/* Transcription reads as data — system monospace (§3.2, same as word lists). */
+.fc-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace;
+}
+
+/* Actions wrap on narrow portrait screens so both buttons stay tappable;
+   equal min-width keeps the pair balanced. */
 .fc-actions {
   flex-wrap: wrap;
 }
 
+.fc-actions .btn {
+  min-width: 8.5rem;
+}
+
 .fc-text {
   overflow-wrap: anywhere;
+}
+
+/* P10 / §8.4 — reduced motion: the flip becomes an instant face swap
+   (function preserved, no rotation animation). */
+@media (prefers-reduced-motion: reduce) {
+  .fc-card {
+    transition: none;
+  }
 }
 </style>

@@ -15,6 +15,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useLearningStore } from '@/stores/learningStore'
 import { speak, stopSpeaking } from '@/services/speech'
 import ProgressStats from '@/components/learning/ProgressStats.vue'
+import AudioPlayButton from '@/components/learning/AudioPlayButton.vue'
 import VocabularyDetailModal from '@/components/learning/VocabularyDetailModal.vue'
 
 const emit = defineEmits(['completed'])
@@ -164,6 +165,12 @@ function onKeydown(event) {
   if (num >= 1 && num <= options.value.length && !answered.value) {
     event.preventDefault()
     pick(num - 1)
+    return
+  }
+  // Keyboard parity (FR-X04): Enter commits & advances, same as the mouse flow.
+  if (event.key === 'Enter' && answered.value) {
+    event.preventDefault()
+    next()
   }
 }
 
@@ -185,20 +192,21 @@ if (store.isSkillCompletedNow) emit('completed')
     <div v-if="item" class="mcq-panel mx-auto my-1">
       <div class="d-flex align-items-center justify-content-between gap-2 mb-2 flex-wrap">
         <span class="badge text-bg-secondary">{{ questionLabel }}</span>
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-primary mcq-replay"
-          :title="speechUnavailable ? 'Thiết bị không hỗ trợ đọc phát âm' : 'Nghe lại'"
-          aria-label="Nghe lại phát âm"
-          @click="replayAudio"
-        >
-          🔊 Nghe
-        </button>
+        <AudioPlayButton
+          variant="icon"
+          aria-label="Nghe lại"
+          :unavailable="speechUnavailable"
+          @play="replayAudio"
+        />
       </div>
+
+      <p v-if="speechUnavailable" class="text-warning small mb-2">
+        Thiết bị không hỗ trợ đọc phát âm.
+      </p>
 
       <p class="mcq-prompt">{{ item.payload.prompt }}</p>
 
-      <div class="mcq-options" role="listbox">
+      <div class="mcq-options" role="group" aria-label="Các đáp án">
         <button
           v-for="(option, index) in options"
           :key="`${item.id}-${index}`"
@@ -221,6 +229,11 @@ if (store.isSkillCompletedNow) emit('completed')
         :class="wasCorrect ? 'text-success' : 'text-danger'"
         role="status"
       >
+        <!-- §7.3: feedback text + auto-advance hint (color pairs with icon) -->
+        <template v-if="wasCorrect">✓ Chính xác! — tiếp tục tự động…</template>
+        <template v-else>
+          ✗ Chưa đúng — đáp án đúng được đánh dấu ✓. Xem chi tiết để học lại.
+        </template>
       </div>
     </div>
 
@@ -259,20 +272,22 @@ if (store.isSkillCompletedNow) emit('completed')
   align-items: center;
   gap: 0.75rem;
   width: 100%;
+  min-height: 44px; /* touch target (§10) */
   padding: 0.75rem 1rem;
   text-align: left;
   font-size: 1.05rem;
-  color: var(--bs-body-color, #212529);
-  border: 1px solid var(--bs-border-color);
-  border-radius: 0.6rem;
+  color: var(--bs-body-color);
+  border: 1px solid var(--app-border);
+  border-radius: 0.9rem;
+  background-color: var(--app-surface);
   cursor: pointer;
   transition: border-color 0.15s, background-color 0.15s, opacity 0.15s;
 }
 
 .mcq-option.is-feedback:hover,
 .mcq-option.is-feedback:focus-visible {
-  border-color: var(--bs-primary);
-  background-color: var(--bs-primary-bg-subtle, rgba(13, 110, 253, 0.08));
+  border-color: var(--app-brand);
+  background-color: rgba(var(--app-brand-rgb), 0.08);
 }
 
 .mcq-option.is-correct,
@@ -289,8 +304,8 @@ if (store.isSkillCompletedNow) emit('completed')
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background-color: var(--bs-light);
-  border: 1px solid var(--bs-border-color);
+  background-color: var(--app-bg);
+  border: 1px solid var(--app-border);
   font-weight: 700;
 }
 
@@ -306,13 +321,13 @@ if (store.isSkillCompletedNow) emit('completed')
 
 .mcq-option.is-correct {
   border-color: var(--bs-success);
-  background-color: var(--bs-success-bg-subtle, #d1e7dd);
+  background-color: rgba(var(--bs-success-rgb), 0.1);
   color: var(--bs-success);
 }
 
 .mcq-option.is-wrong {
   border-color: var(--bs-danger);
-  background-color: var(--bs-danger-bg-subtle, #f8d7da);
+  background-color: rgba(var(--bs-danger-rgb), 0.1);
   color: var(--bs-danger);
 }
 

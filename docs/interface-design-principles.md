@@ -292,6 +292,7 @@ Hierarchy rules:
 | `CollectionCard`, `CollectionFormModal` | `collections/` | Collection grid card + create/edit modal. `CollectionCard` anatomy: brand-tinted gradient **hero** (monogram avatar from `symbol`, `fw-semibold` title, monospace code chip + language), **meta row** (`Tạo <date>` via `lib/datetime` + 44×44 edit/delete icon buttons with `aria-label`), **action pair** (`Học ngay →` `btn-outline-primary fw-semibold` + `Từ vựng` — outline only; the Home header CTA is the page's single primary). Hover/focus lift + brand ring; `prefers-reduced-motion` honored. |
 | `FilterBar`, `WordRow`, `ComboBoxField`, `WordFormModal` | `words/` | Search/filter row, list row, combo inputs, word CRUD modal. Reuse `FilterBar` anywhere a word list needs search+filters (already used by Word Selection). |
 | `ProgressStats` | `learning/` | Progress badges + bar (BR-60..62). Required on every learning screen; sticky inside `.learning-stage`. |
+| `AudioPlayButton` | `learning/` | Shared TTS replay trigger for all skill games. **All four games use the `icon` variant — a round 44px ghost glyph — for a uniform interface.** The `label` / `large` variants remain available if a screen ever needs a text affordance. Parents own `speak()` via `services/speech` and pass `unavailable` (AMB-12) to disable; the component never touches the Web Speech API and stops native click propagation (flashcard flip-safe). |
 | `VocabularyDetailModal` | `learning/` | Full word detail popup (wrong-answer study card, Teleported, `Đã học` advances). Reuse for any "show word details" need. |
 | Skill games | `learning/skills/` | `FlashCardGame`, `MultipleChoiceGame`, `ListeningGame`, `TypingGame` — share one anatomy (§7.3). |
 | Views | `views/` | Home, WordManagement, WordSelection, SkillSelection, Learning, NotFound. |
@@ -323,8 +324,10 @@ ProgressStats                     (sticky in stage)
   (`cursor: default`, `pick()` guards).
 - **Feedback text**: success/danger colored + `role="status"`; auto-advance
   shows "— tiếp tục tự động…".
-- **Audio button**: `🔊` + label, disabled when TTS unavailable + warning text;
-  always via `services/speech` — components never touch `window.speechSynthesis`.
+- **Audio button**: shared `AudioPlayButton` (§7.1) rendered as the same round
+  icon button in every skill game, disabled when TTS unavailable + warning
+  text; playback stays in `services/speech` — neither the component nor the
+  games touch `window.speechSynthesis`.
 - **Wrong-answer popup**: `VocabularyDetailModal` only; commit to engine only
   on `Đã học` (wrong → re-queued, not learned).
 - **Timers**: every auto-advance timer must be cleared on question change and

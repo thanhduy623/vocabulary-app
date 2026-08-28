@@ -47,7 +47,8 @@ const detailRows = computed(() =>
     <div class="vocab-detail-backdrop" role="dialog" aria-modal="true" aria-label="Chi tiết từ vựng">
       <div class="vocab-detail-card">
         <div class="vocab-detail-header" :class="wasCorrect ? 'is-correct' : 'is-wrong'">
-          <span class="text-uppercase">{{ wasCorrect ? 'Chính xác!' : 'Chưa đúng' }}</span>
+          <!-- Icon pairs with color so the state is never color-only (§9.4) -->
+          <span class="text-uppercase">{{ wasCorrect ? '✓ Chính xác!' : '✗ Chưa đúng' }}</span>
         </div>
 
         <div class="vocab-detail-body">
@@ -111,9 +112,22 @@ const detailRows = computed(() =>
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  background-color: var(--bs-body-bg, #fff);
+  background-color: var(--app-surface);
   border-radius: 0.9rem;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+  /* §8: modal appear = fade + slight scale, 200ms ease-out (transform/opacity). */
+  animation: vocab-detail-in 200ms ease-out;
+}
+
+@keyframes vocab-detail-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .vocab-detail-header {
@@ -124,7 +138,7 @@ const detailRows = computed(() =>
   padding: 0.85rem 1rem;
   font-weight: 700;
   font-size: 1.05rem;
-  color: #fff;
+  color: var(--bs-white);
   border-radius: 0.9rem 0.9rem 0 0;
 }
 .vocab-detail-header.is-correct {
@@ -140,13 +154,15 @@ const detailRows = computed(() =>
 
 .vocab-word {
   font-size: 1.6rem;
-  font-weight: 700;
+  font-weight: 600; /* §3.2: fw-semibold for emphasis, bold only for marks */
   overflow-wrap: anywhere;
 }
 
 .vocab-transcription {
   color: var(--bs-secondary);
   font-size: 1.05rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace;
 }
 
 .vocab-rows {
@@ -186,5 +202,12 @@ const detailRows = computed(() =>
 .vocab-detail-footer .learn-btn {
   min-height: 48px;
   font-size: 1.1rem;
+}
+
+/* P10 / §8.4 — remove non-essential motion. */
+@media (prefers-reduced-motion: reduce) {
+  .vocab-detail-card {
+    animation: none;
+  }
 }
 </style>

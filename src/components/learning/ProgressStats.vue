@@ -22,10 +22,13 @@ const percent = computed(() => {
 <template>
   <div class="progress-stats mb-3">
     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-      <span class="badge text-bg-primary">
+      <!-- Semantic badges per §3.1/§9.2: success = learned/progress,
+           warning + text-dark = pending, success/danger = correct/wrong
+           (✓/⏳ icons keep color from being the only signal, §9.4). -->
+      <span class="badge text-bg-success">
         ✓ Hoàn thành: {{ progress.completed }} / {{ progress.total }}
       </span>
-      <span class="badge text-bg-secondary">
+      <span class="badge text-bg-warning text-dark">
         ⏳ Còn lại: {{ progress.remaining }}
       </span>
       <span class="badge text-bg-success">Đúng: {{ progress.correct }}</span>

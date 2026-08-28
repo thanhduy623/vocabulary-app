@@ -16,6 +16,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useLearningStore } from '@/stores/learningStore'
 import { speak, stopSpeaking } from '@/services/speech'
 import ProgressStats from '@/components/learning/ProgressStats.vue'
+import AudioPlayButton from '@/components/learning/AudioPlayButton.vue'
 import VocabularyDetailModal from '@/components/learning/VocabularyDetailModal.vue'
 
 const emit = defineEmits(['completed'])
@@ -161,6 +162,12 @@ function onKeydown(event) {
     pick(num - 1)
     return
   }
+  // Keyboard parity (FR-X04): Enter commits & advances, same as the mouse flow.
+  if (event.key === 'Enter' && answered.value) {
+    event.preventDefault()
+    next()
+    return
+  }
   if (event.key === 'r' || event.key === 'R') {
     event.preventDefault()
     replayAudio()
@@ -187,22 +194,19 @@ if (store.isSkillCompletedNow) emit('completed')
 
       <!-- Audio prompt area: auto-plays on new question; replay on demand -->
       <div class="listen-audio text-center my-3">
-        <button
-          type="button"
-          class="btn btn-outline-primary btn-lg listen-replay"
-          :title="speechUnavailable ? 'Thiết bị không hỗ trợ đọc phát âm' : 'Nghe lại'"
+        <AudioPlayButton
+          class="mx-auto"
+          variant="icon"
           aria-label="Nghe lại"
-          @click="replayAudio"
-        >
-          <span class="listen-replay-icon">🔊</span>
-          <span class="d-block fs-6 mt-1">Nghe lại</span>
-        </button>
+          :unavailable="speechUnavailable"
+          @play="replayAudio"
+        />
         <p v-if="speechUnavailable" class="text-warning small mb-0 mt-2">
           Thiết bị không hỗ trợ đọc phát âm.
         </p>
       </div>
 
-      <div class="listen-options" role="listbox">
+      <div class="listen-options" role="group" aria-label="Các đáp án">
         <button
           v-for="(option, index) in options"
           :key="`${item.id}-${index}`"
@@ -225,6 +229,11 @@ if (store.isSkillCompletedNow) emit('completed')
         :class="wasCorrect ? 'text-success' : 'text-danger'"
         role="status"
       >
+        <!-- §7.3: feedback text + auto-advance hint (color pairs with icon) -->
+        <template v-if="wasCorrect">✓ Chính xác! — tiếp tục tự động…</template>
+        <template v-else>
+          ✗ Chưa đúng — đáp án đúng được đánh dấu ✓. Xem chi tiết để học lại.
+        </template>
       </div>
     </div>
 
@@ -243,16 +252,6 @@ if (store.isSkillCompletedNow) emit('completed')
   width: min(560px, 100%);
 }
 
-.listen-audio .listen-replay {
-  padding: 1rem 2rem;
-  border-radius: 0.9rem;
-}
-
-.listen-replay-icon {
-  font-size: 2.2rem;
-  line-height: 1;
-}
-
 .listen-options {
   display: grid;
   gap: 0.6rem;
@@ -263,20 +262,22 @@ if (store.isSkillCompletedNow) emit('completed')
   align-items: center;
   gap: 0.75rem;
   width: 100%;
+  min-height: 44px; /* touch target (§10) */
   padding: 0.75rem 1rem;
   text-align: left;
   font-size: 1.05rem;
-  color: var(--bs-body-color, #212529);
-  border: 1px solid var(--bs-border-color);
-  border-radius: 0.6rem;
+  color: var(--bs-body-color);
+  border: 1px solid var(--app-border);
+  border-radius: 0.9rem;
+  background-color: var(--app-surface);
   cursor: pointer;
   transition: border-color 0.15s, background-color 0.15s, opacity 0.15s;
 }
 
 .listen-option.is-feedback:hover,
 .listen-option.is-feedback:focus-visible {
-  border-color: var(--bs-primary);
-  background-color: var(--bs-primary-bg-subtle, rgba(13, 110, 253, 0.08));
+  border-color: var(--app-brand);
+  background-color: rgba(var(--app-brand-rgb), 0.08);
 }
 
 .listen-option.is-correct,
@@ -293,8 +294,8 @@ if (store.isSkillCompletedNow) emit('completed')
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background-color: var(--bs-light);
-  border: 1px solid var(--bs-border-color);
+  background-color: var(--app-bg);
+  border: 1px solid var(--app-border);
   font-weight: 700;
 }
 
@@ -310,13 +311,13 @@ if (store.isSkillCompletedNow) emit('completed')
 
 .listen-option.is-correct {
   border-color: var(--bs-success);
-  background-color: var(--bs-success-bg-subtle, #d1e7dd);
+  background-color: rgba(var(--bs-success-rgb), 0.1);
   color: var(--bs-success);
 }
 
 .listen-option.is-wrong {
   border-color: var(--bs-danger);
-  background-color: var(--bs-danger-bg-subtle, #f8d7da);
+  background-color: rgba(var(--bs-danger-rgb), 0.1);
   color: var(--bs-danger);
 }
 
