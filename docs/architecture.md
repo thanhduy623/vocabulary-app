@@ -194,6 +194,7 @@ SkillSelection → learning.service.startSession({...})
 | `/collection/:collectionId/words` | WordManagementView | requires `selectedCollectionId` (set from route param) |
 | `/learn/select-words` | WordSelectionView | requires selected collection; restores `selectedWordIds` |
 | `/learn/select-skills` | SkillSelectionView | requires ≥4 selected words |
+| `/learn/select-options` | SkillOptionsView | requires ≥1 selected skill (`selectedSkillIds`); the official session starts here (BR-35) |
 | `/learn/:skillId` | LearningView | requires `learningSession`; unknown id → redirect back |
 | `:catchAll(.*)` | NotFoundView | graceful 404 |
 

@@ -19,16 +19,31 @@ export const meta = Object.freeze({
   label: 'Thẻ nhớ',
   description: 'Lật thẻ để ghi nhớ từ vựng.',
   icon: 'cards',
+  /**
+   * Learner-selectable options (FR-L04b). Each option id IS the item
+   * template it enables; the BACK always carries the full details + audio.
+   */
+  options: Object.freeze([
+    { id: 'card-front-word', label: 'Mặt trước: Từ' },
+    { id: 'card-front-transcription', label: 'Mặt trước: Phiên âm' },
+    { id: 'card-front-meaning', label: 'Mặt trước: Nghĩa' },
+  ]),
 })
 
 /**
  * Generate flash-card items for the given words.
  * @param {Object[]} words
- * @param {{rng: () => number, lang?: string}} ctx
+ * @param {{rng: () => number, lang?: string, options?: string[]}} ctx
+ *   ctx.options = selected option ids (templates). Empty/omitted → all fronts.
  * @returns {Object[]} shuffled item list
  */
-export function generate(words, { rng }) {
+export function generate(words, ctx = {}) {
   const items = []
+  const rng = ctx?.rng ?? Math.random
+  const allowed =
+    Array.isArray(ctx?.options) && ctx.options.length > 0
+      ? new Set(ctx.options)
+      : null
 
   for (const w of words) {
     const detail = {
@@ -41,17 +56,22 @@ export function generate(words, { rng }) {
     }
     const audioText = String(w.word ?? '')
 
-    // Card 1 — always present (word is required by BR-21).
-    items.push(
-      createItem({
-        skillId: meta.id,
-        template: 'card-front-word',
-        sourceWordId: w.id,
-        payload: { front: audioText, detail, audioText },
-      }),
-    )
+    // Card 1 — front = word (option-selectable).
+    if (!allowed || allowed.has('card-front-word')) {
+      items.push(
+        createItem({
+          skillId: meta.id,
+          template: 'card-front-word',
+          sourceWordId: w.id,
+          payload: { front: audioText, detail, audioText },
+        }),
+      )
+    }
 
-    if (detail.transcription.trim()) {
+    if (
+      detail.transcription.trim() &&
+      (!allowed || allowed.has('card-front-transcription'))
+    ) {
       items.push(
         createItem({
           skillId: meta.id,
@@ -66,7 +86,10 @@ export function generate(words, { rng }) {
       )
     }
 
-    if (detail.meaning.trim()) {
+    if (
+      detail.meaning.trim() &&
+      (!allowed || allowed.has('card-front-meaning'))
+    ) {
       items.push(
         createItem({
           skillId: meta.id,

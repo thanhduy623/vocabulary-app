@@ -28,13 +28,9 @@ function toggleSkill(skillId) {
   else store.setSelectedSkillIds([skillId])
 }
 
-async function startLearning() {
-  const res = store.startSession()
-  if (!res.ok) return
-  router.push({
-    name: 'learning',
-    params: { skillId: res.skillId ?? store.activeSkillId },
-  })
+/** Skills picked → proceed to the per-skill options step (new workflow). */
+function proceedToOptions() {
+  router.push({ name: ROUTE_NAMES.skillOptions })
 }
 
 function backToWords() {
@@ -68,9 +64,9 @@ onBeforeRouteLeave((to) => {
           type="button"
           class="btn btn-primary d-inline-flex align-items-center gap-2"
           :disabled="!store.canStart"
-          @click="startLearning"
+          @click="proceedToOptions"
         >
-          Bắt đầu học
+          Tiếp
           <span aria-hidden="true">&rarr;</span>
         </button>
     </header>

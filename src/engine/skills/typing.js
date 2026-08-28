@@ -5,9 +5,11 @@
 //   transcription → word
 //   meaning       → word
 //
-// Comparison is normalized (trimmed, lowercased, whitespace-collapsed —
-// BR-50 / AMB-13). Unicode diacritic folding is opt-in per item via
-// payload.foldDiacritics (default off).
+// The learner pre-selects which templates to practice (meta.options, wired to
+// the Skill Options step); the session then mixes them randomly. Comparison is
+// normalized (trimmed, lowercased, whitespace-collapsed — BR-50 / AMB-13).
+// Unicode diacritic folding is opt-in per item via payload.foldDiacritics
+// (default off).
 
 import { createItem } from '@/engine/core/item'
 import { SKILL_IDS } from '@/engine/core/constants'
@@ -18,6 +20,12 @@ export const meta = Object.freeze({
   label: 'Luyện gõ',
   description: 'Gõ câu trả lời tương ứng với từ khóa.',
   icon: 'keyboard',
+  /** Learner-selectable key → type pairs; each id IS the template. */
+  options: Object.freeze([
+    { id: 'type-word-transcription', label: 'Từ → Gõ PHIÊN ÂM' },
+    { id: 'type-transcription-word', label: 'Phiên âm → Gõ TỪ' },
+    { id: 'type-meaning-word', label: 'Nghĩa → Gõ TỪ' },
+  ]),
 })
 
 /** Ordered (keyField, targetField) template pairs — BR-50. */
@@ -28,38 +36,23 @@ const TEMPLATES = Object.freeze([
 ])
 
 /**
- * Practice modes — the learner chooses WHAT to type.
- *   word        → prompts whose ANSWER is the WORD (transcription → word, meaning → word)
- *   transcription → prompts whose ANSWER is the TRANSCRIPTION (word → transcription)
- * null/omitted → all templates (default, used by tests / non-mode callers).
- */
-export const TYPING_MODE = Object.freeze({
-  WORD: 'word',
-  TRANSCRIPTION: 'transcription',
-})
-
-/**
- * Templates whose ANSWER field matches the requested mode.
- * @param {string|null} mode
- * @returns {[string, string][]}
- */
-function templatesForMode(mode) {
-  if (!mode) return TEMPLATES
-  return TEMPLATES.filter(([, targetField]) => targetField === mode)
-}
-
-/**
  * Generate typing items.
  * @param {Object[]} words
- * @param {{rng: () => number, lang?: string, mode?: string|null}} ctx
- *   ctx.mode filters templates to a single typing direction (see TYPING_MODE).
+ * @param {{rng: () => number, lang?: string, options?: string[]}} ctx
+ *   ctx.options = selected option ids (templates). Empty/omitted → all pairs.
  */
 export function generate(words, ctx = {}) {
   const items = []
-  const templates = templatesForMode(ctx?.mode)
+  const allowed =
+    Array.isArray(ctx?.options) && ctx.options.length > 0
+      ? new Set(ctx.options)
+      : null
 
   for (const w of words) {
-    for (const [keyField, targetField] of templates) {
+    for (const [keyField, targetField] of TEMPLATES) {
+      const template = `type-${keyField}-${targetField}`
+      if (allowed && !allowed.has(template)) continue
+
       const prompt = String(w[keyField] ?? '').trim()
       const expected = String(w[targetField] ?? '').trim()
       if (!prompt || !expected) continue
@@ -67,7 +60,7 @@ export function generate(words, ctx = {}) {
       items.push(
         createItem({
           skillId: meta.id,
-          template: `type-${keyField}-${targetField}`,
+          template,
           sourceWordId: w.id,
           payload: {
             prompt,

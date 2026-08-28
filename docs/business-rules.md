@@ -50,8 +50,9 @@ Rules are grouped by domain and carry stable IDs referenced by tests and impleme
 | BR-31 | The learner must pick **at least 4 words** (`selectedWordIds.length ≥ 4`); the CTA is disabled otherwise. | req. §13 |
 | BR-32 | If a collection has fewer than 4 words, `TIẾP` stays disabled and the UI shows a hint ("add at least N more words"). | AMB-6 |
 | BR-33 | The learner must select **at least 1 skill** (`selectedSkillIds.length >= 1`); all available skills may be selected. | req. §15 |
+| BR-33b | This app uses **single skill selection** and a separate **Skill Options** step: after picking a skill, the learner must select **≥1 option** per skill (`skillOptions[skillId].length >= 1`) before the session may start. Options are template filters (e.g. TYPING: word→transcription / transcription→word / meaning→word); multiple options mix directions randomly. | req. §15 |
 | BR-34 | Study selections are scoped to the collection: `selectedWordIds` restores only when returning to word selection for the same `selectedCollectionId`. | req. §11 |
-| BR-35 | The session may start only when both preconditions hold (≥4 words, ≥1 skill): snapshot → item generation → randomization → progress/retry init → first skill. | req. §17 |
+| BR-35 | The session may start ONLY after all preconditions hold (≥4 words, ≥1 skill, ≥1 option per selected skill): snapshot → item generation → randomization → progress/retry init → first skill. | req. §17 |
 
 ### 4.1 Per-skill rules
 

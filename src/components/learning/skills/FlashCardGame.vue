@@ -28,6 +28,17 @@ const speechUnavailable = ref(false)
 const item = computed(() => store.currentItem)
 const progress = computed(() => store.currentProgress)
 
+/**
+ * Which front the current card shows — the option mix is randomized, so
+ * every card must state its own type (FR-L04b / "indicate question type").
+ */
+const FRONT_LABELS = {
+  'card-front-word': 'Từ',
+  'card-front-transcription': 'Phiên âm',
+  'card-front-meaning': 'Nghĩa',
+}
+const frontLabel = computed(() => FRONT_LABELS[item.value?.template] ?? 'Từ')
+
 // Reset the flip state whenever the current card changes.
 watch(
   () => item.value?.id,
@@ -120,7 +131,7 @@ if (store.isSkillCompletedNow) emit('completed')
       <div class="fc-card" :class="{ 'is-flipped': isFlipped }" >
         <!-- FRONT -->
         <div class="fc-face fc-front d-flex flex-column justify-content-center align-items-center p-4">
-          <span class="badge text-bg-light mb-3">Mặt trước</span>
+          <span class="badge text-bg-light mb-3">Mặt trước: {{ frontLabel }}</span>
           <p class="fc-text display-5 fw-semibold text-center m-0">
             {{ item.payload.front }}
           </p>

@@ -35,6 +35,9 @@ router.beforeEach((to) => {
   if (to.meta?.requiresWords && !learningStore.canProceedToSkills) {
     return { name: 'word-selection' }
   }
+  if (to.meta?.requiresSkills && learningStore.selectedSkillIds.length === 0) {
+    return { name: 'skill-selection' }
+  }
   if (to.meta?.requiresSession && !learningStore.learningSession) {
     return { name: 'skill-selection' }
   }

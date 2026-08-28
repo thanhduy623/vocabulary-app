@@ -4,8 +4,9 @@
 // UI responsibilities only — item generation, mode filtering and all session
 // rules (queue, retry re-insertion, progress, completion) live in the engine
 // via learningStore. Feedback correctness uses the SAME engine evaluate().
-//   - on entry the learner picks a MODE (word-based or transcription-based
-//     practice); this re-generates the TYPING plan via store.startTypingMode
+//   - the option mix (which key→type pairs to practice) is chosen on the
+//     Skill Options step before the session starts; this screen just renders
+//     the resulting random mix
 //   - type the answer; Enter or "Kiểm tra" checks
 //   - correct → green + auto-advance after ~1.2s, marked learned
 //   - wrong   → red + full vocabulary popup; waits for "Đã học" (re-queued)
@@ -23,27 +24,6 @@ const store = useLearningStore()
 
 const item = computed(() => store.currentItem)
 const progress = computed(() => store.currentProgress)
-
-/** Selected practice mode: null (pick) | 'word' | 'transcription'. */
-const mode = ref(null)
-/** Whether the mode-picker is shown (while no mode has been chosen). */
-const showModePicker = computed(() => mode.value === null)
-
-/** Practice modes offered to the learner (map to engine TYPING_MODE filter). */
-const MODE_OPTIONS = [
-  {
-    id: 'transcription',
-    label: 'Luyện phiên âm',
-    description: 'Hiện từ tiếng Anh / nghĩa → bạn gõ phiên âm.',
-    glyph: '/ə/',
-  },
-  {
-    id: 'word',
-    label: 'Luyện từ',
-    description: 'Hiện phiên âm / nghĩa → bạn gõ từ tiếng Anh.',
-    glyph: 'Aa',
-  },
-]
 
 /** Input bound to a template ref so we can focus it. */
 const inputEl = ref(null)
@@ -115,9 +95,6 @@ const targetLabel = computed(
   () => FIELD_LABELS[item.value?.payload?.targetField] ?? 'câu trả lời',
 )
 
-/** Uppercase variant for the "Gõ: TỪ / PHIÊN ÂM" badge. */
-const targetLabelUpper = computed(() => targetLabel.value.toUpperCase())
-
 /** Transcription targets (IPA) render in the data monospace style (§3.2). */
 const isTranscriptionTarget = computed(() => targetLabel.value === 'phiên âm')
 
@@ -142,8 +119,8 @@ const feedbackClass = computed(() => {
   return wasCorrect.value ? 'is-correct' : 'is-wrong'
 })
 
-// Reset the input + answer state, auto-play, and ensure the picker shows
-// until a mode is chosen.
+// Reset the input + answer state, auto-play, and refocus the input
+// whenever the current item changes.
 watch(
   () => item.value?.id,
   async () => {
@@ -159,26 +136,6 @@ watch(
   },
   { immediate: true },
 )
-
-/** Pick the practice mode and (re)start the typing skill for it. */
-function selectMode(chosen) {
-  if (!store.startTypingMode(chosen)) return
-  // A (re)started plan always begins fresh — clear any in-flight answer state
-  // so the panel never shows stale feedback from the previous mode.
-  clearAdvanceTimer()
-  typedValue.value = ''
-  submittedValue.value = ''
-  submitted.value = false
-  wasCorrect.value = false
-  showDetail.value = false
-  mode.value = chosen
-}
-
-/** Back to the mode picker (convenience). The plan restarts on re-pick. */
-function changeMode() {
-  clearAdvanceTimer()
-  mode.value = null
-}
 
 /** Check the typed answer: lock input, show feedback, then drive advance. */
 function check() {
@@ -234,37 +191,8 @@ if (store.isSkillCompletedNow) emit('completed')
   <div class="typing-game">
     <ProgressStats v-if="progress" :progress="progress" />
 
-    <!-- MODE PICKER: choose what to type before practice starts -->
-    <div v-if="showModePicker" class="type-picker mx-auto my-2">
-      <p class="type-eyebrow">Luyện gõ</p>
-      <h2 class="h4 text-center mb-4">Bạn muốn gõ gì?</h2>
-
-      <div class="row g-3">
-        <div v-for="opt in MODE_OPTIONS" :key="opt.id" class="col-12 col-sm-6">
-          <button
-            type="button"
-            class="card h-100 w-100 border text-start p-3 type-mode-card"
-            @click="selectMode(opt.id)"
-          >
-            <div class="d-flex align-items-center gap-3">
-              <span class="type-mode-icon" aria-hidden="true">{{ opt.glyph }}</span>
-              <div class="min-w-0">
-                <div class="fw-semibold mb-1">{{ opt.label }}</div>
-                <div class="small text-muted">{{ opt.description }}</div>
-              </div>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      <p class="text-muted small text-center mt-3 mb-0">
-        Bạn có thể đổi chế độ bất cứ lúc nào bằng nút "Đổi chế độ".
-      </p>
-    </div>
-
-    <!-- QUESTION MODE -->
-    <template v-else>
-      <div v-if="item" class="type-panel mx-auto my-1">
+    <!-- QUESTION (the option mix is chosen on the Skill Options step) -->
+    <div v-if="item" class="type-panel mx-auto my-1">
         <!-- Shared uniform audio button, corner-pinned like the flashcard -->
         <AudioPlayButton
           class="type-speak position-absolute"
@@ -287,9 +215,8 @@ if (store.isSkillCompletedNow) emit('completed')
           </p>
         </div>
 
-        <!-- Targeted input; the floating chip restates what to type -->
+        <!-- Targeted input; the ✓/✗ mark sits inside the field after answering -->
         <div class="type-input-row">
-          <span class="type-target-chip">Gõ: {{ targetLabelUpper }}</span>
           <input
             ref="inputEl"
             v-model="typedValue"
@@ -336,17 +263,9 @@ if (store.isSkillCompletedNow) emit('completed')
              auto-advance wait (next() already clears the timer) -->
         <div class="d-flex justify-content-between align-items-center mt-3 type-actions">
           <button
-            type="button"
-            class="btn btn-sm btn-outline-secondary"
-            title="Đổi chế độ — tiến trình luyện gõ sẽ bắt đầu lại"
-            @click="changeMode"
-          >
-            Đổi chế độ
-          </button>
-          <button
             v-if="!submitted"
             type="button"
-            class="btn btn-primary"
+            class="btn btn-primary w-100"
             :disabled="isEmpty"
             @click="check"
           >
@@ -355,7 +274,7 @@ if (store.isSkillCompletedNow) emit('completed')
           <button
             v-else-if="wasCorrect"
             type="button"
-            class="btn btn-primary"
+            class="btn btn-primary w-100"
             @click="next"
           >
             Tiếp theo
@@ -364,68 +283,17 @@ if (store.isSkillCompletedNow) emit('completed')
         </div>
       </div>
 
-      <!-- Wrong answer: study card with full details; only "Đã học" advances -->
-      <VocabularyDetailModal
-        v-if="showDetail"
-        :word="sourceWord"
-        :was-correct="false"
-        @learned="onLearned"
-      />
-    </template>
+    <!-- Wrong answer: study card with full details; only "Đã học" advances -->
+    <VocabularyDetailModal
+      v-if="showDetail"
+      :word="sourceWord"
+      :was-correct="false"
+      @learned="onLearned"
+    />
   </div>
 </template>
 
 <style scoped>
-.type-picker {
-  width: min(560px, 100%);
-}
-
-/* Mode cards: same interactive-card language as the skill picker (§7.5). */
-.type-mode-card {
-  cursor: pointer;
-  border-radius: 0.9rem;
-  background-color: var(--app-surface);
-  transition:
-    transform 150ms ease,
-    border-color 150ms ease,
-    box-shadow 150ms ease;
-}
-
-/* Hover/focus lift (§3.3 level 2) + brand ring. */
-.type-mode-card:hover,
-.type-mode-card:focus-visible {
-  transform: translateY(-2px);
-  border-color: rgba(var(--app-brand-rgb), 0.45);
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.08),
-    0 0 0 3px rgba(var(--app-brand-rgb), 0.12);
-}
-
-/* Brand-gradient tile matching the skill-selection icon language (§7.1). */
-.type-mode-icon {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 0.9rem;
-  background: linear-gradient(
-    135deg,
-    var(--app-brand),
-    rgba(var(--app-brand-rgb), 0.72)
-  );
-  color: var(--app-brand-contrast);
-  font-weight: 700;
-  font-size: 0.95rem;
-  letter-spacing: 0.02em;
-  box-shadow: 0 6px 18px rgba(var(--app-brand-rgb), 0.35);
-}
-
-/* Shrinkable flex children need min-width: 0 (§3.2). */
-.min-w-0 {
-  min-width: 0;
-}
-
 /* Focus panel (§5.3) — shared card surface + entrance animation (§8). */
 .type-panel {
   position: relative;
@@ -494,27 +362,10 @@ if (store.isSkillCompletedNow) emit('completed')
     'Liberation Mono', monospace;
 }
 
-/* Input row: floating target chip + result mark inside the field. */
+/* Input row: result mark sits inside the field. */
 .type-input-row {
   position: relative;
   margin-bottom: 0.25rem;
-}
-
-.type-target-chip {
-  position: absolute;
-  top: -0.7rem;
-  left: 0.75rem;
-  z-index: 2;
-  padding: 0.1rem 0.5rem;
-  border: 1px solid rgba(var(--app-brand-rgb), 0.35);
-  border-radius: 0.375rem;
-  background-color: rgba(var(--app-brand-rgb), 0.08);
-  color: var(--app-brand);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  pointer-events: none;
 }
 
 .type-input {
@@ -585,13 +436,6 @@ if (store.isSkillCompletedNow) emit('completed')
 
 /* P10 / §8.4 — remove non-essential motion. */
 @media (prefers-reduced-motion: reduce) {
-  .type-mode-card,
-  .type-mode-card:hover,
-  .type-mode-card:focus-visible {
-    transform: none;
-    transition: none;
-  }
-
   .type-panel,
   .type-input-mark {
     animation: none;

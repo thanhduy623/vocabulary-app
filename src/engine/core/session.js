@@ -31,6 +31,7 @@ import { getSkill } from '../registry'
  *   skillIds: string[],       // selected skills, in learner-chosen order
  *   lang?: string,            // collection.symbol for TTS playback
  *   seed?: number|null,       // reproducible generation for tests/replay
+ *   skillOptions?: Object,    // { [skillId]: string[] } selected option ids
  * }} params
  * @returns {Object} session
  */
@@ -40,6 +41,7 @@ export function createLearningSession({
   skillIds = [],
   lang = '',
   seed = null,
+  skillOptions = {},
 } = {}) {
   if (!Array.isArray(words) || words.length === 0) {
     throw new Error('createLearningSession: words must be a non-empty array')
@@ -59,9 +61,18 @@ export function createLearningSession({
   const skills = {}
   for (const id of skillIds) {
     const skill = getSkill(id)
-    const items = shuffle(skill.generate(words, { rng, lang }), rng)
+    // Selected option ids for this skill (template filter); empty → all.
+    const selectedOptions = Array.isArray(skillOptions?.[id])
+      ? [...skillOptions[id]]
+      : []
+    const items = shuffle(
+      skill.generate(words, { rng, lang, options: selectedOptions }),
+      rng,
+    )
     skills[id] = {
       meta: { ...skill.meta },
+      // Kept on the plan so resetSkill() regenerates the SAME option mix.
+      options: selectedOptions,
       total: items.length,
       completed: 0,
       correct: 0,
@@ -90,14 +101,14 @@ export function createLearningSession({
 /**
  * Forget a skill's process: regenerate its plan from scratch (fresh shuffle,
  * zeroed counters, status back to pending). Used when the learner backs out
- * of a skill, wants to re-study an already completed one, or (for mode-based
- * skills like TYPING) picks a different practice mode (e.g. word vs
- * transcription).
+ * of a skill or wants to re-study an already completed one. The plan's own
+ * selected options (see createLearningSession) are re-applied so the option
+ * mix survives resets.
  *
  * @param {Object} session
  * @param {string} skillId
  * @param {Object} [generateOptions]  extra options forwarded to skill.generate
- *                                    (e.g. { mode } for TYPING)
+ *                                    (override the plan's stored options)
  * @returns {Object} the reset plan
  */
 export function resetSkill(session, skillId, generateOptions = {}) {
@@ -109,6 +120,7 @@ export function resetSkill(session, skillId, generateOptions = {}) {
     skill.generate(session.words ?? [], {
       rng,
       lang: session.lang,
+      options: plan.options ?? [],
       ...generateOptions,
     }),
     rng,

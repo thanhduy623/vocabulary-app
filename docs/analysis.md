@@ -88,6 +88,7 @@ IDs (`FR-*`) are referenced by all other documents to trace rules, states, and t
 | FR-L02 | Word Selection: per-row checkboxes + Select All; restores prior selection for the same collection; shows `Đã chọn: X / total`; CTA is anchored/sticky. |
 | FR-L03 | `TIẾP` enabled only when `selectedWordIds.length ≥ 4`. |
 | FR-L04 | Skill Selection: 4 skill cards (FLASH_CARD, MULTIPLE_CHOICE, LISTENING, TYPING); 1..4 selectable; at least 1 required. |
+| FR-L04b | Skill Options: after selecting skills, the learner picks ≥1 option per skill (e.g. TYPING: word→transcription, transcription→word, meaning→word). Multi-select mixes the chosen directions randomly into the session. The session officially starts only after options are chosen and "Bắt đầu học" is clicked. |
 | FR-L05 | Starting the session snapshots the selection, generates skill items, randomizes, initializes progress + retry queue, lands on first selected skill. |
 | FR-L06 | **FLASH_CARD**: 3 card types per word (word→detail, transcription→detail, meaning→detail); flip by click/`Enter`/`Space`; must flip before acting; `Đã nhớ` and `Học lại` buttons; retry cards re-inserted randomly; ends only when all cards mastered. |
 | FR-L07 | **MULTIPLE_CHOICE**: 6 question types (word→transcription, word→meaning, transcription→word, transcription→meaning, meaning→word, meaning→transcription); 4 options; instant green/red feedback; correct answer revealed; wrong questions re-inserted randomly; ends only when all are correct. |

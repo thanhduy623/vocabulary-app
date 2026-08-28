@@ -18,6 +18,15 @@ export const meta = Object.freeze({
   label: 'Chọn từ',
   description: 'Đọc câu hỏi và chọn đáp án đúng.',
   icon: 'list-check',
+  /** Learner-selectable Q → A direction pairs; each id IS the template. */
+  options: Object.freeze([
+    { id: 'mcq-word-transcription', label: 'Từ → Phiên âm' },
+    { id: 'mcq-word-meaning', label: 'Từ → Nghĩa' },
+    { id: 'mcq-transcription-word', label: 'Phiên âm → Từ' },
+    { id: 'mcq-transcription-meaning', label: 'Phiên âm → Nghĩa' },
+    { id: 'mcq-meaning-word', label: 'Nghĩa → Từ' },
+    { id: 'mcq-meaning-transcription', label: 'Nghĩa → Phiên âm' },
+  ]),
 })
 
 /** Ordered (promptField, answerField) template pairs — BR-44. */
@@ -33,13 +42,22 @@ const TEMPLATES = Object.freeze([
 /**
  * Generate multiple-choice items.
  * @param {Object[]} words
- * @param {{rng: () => number, lang?: string}} ctx
+ * @param {{rng: () => number, lang?: string, options?: string[]}} ctx
+ *   ctx.options = selected option ids (templates). Empty/omitted → all pairs.
  */
-export function generate(words, { rng }) {
+export function generate(words, ctx = {}) {
   const items = []
+  const rng = ctx?.rng ?? Math.random
+  const allowed =
+    Array.isArray(ctx?.options) && ctx.options.length > 0
+      ? new Set(ctx.options)
+      : null
 
   for (const w of words) {
     for (const [promptField, answerField] of TEMPLATES) {
+      const template = `mcq-${promptField}-${answerField}`
+      if (allowed && !allowed.has(template)) continue
+
       const prompt = String(w[promptField] ?? '').trim()
       const expected = String(w[answerField] ?? '').trim()
       if (!prompt || !expected) continue // skip blank-prompt templates
@@ -51,7 +69,7 @@ export function generate(words, { rng }) {
       items.push(
         createItem({
           skillId: meta.id,
-          template: `mcq-${promptField}-${answerField}`,
+          template,
           sourceWordId: w.id,
           payload: {
             prompt,

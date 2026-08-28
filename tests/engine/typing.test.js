@@ -17,11 +17,11 @@ describe('TYPING generation (BR-50)', () => {
     }
   })
 
-  it('filters templates by mode: transcription-mode only gõ phiên âm', () => {
+  it('filters templates by selected options: only word → gõ phiên âm', () => {
     const words = freshWords()
     const items = typing.generate(words, {
       rng: createRng(99),
-      mode: 'transcription',
+      options: ['type-word-transcription'],
     })
     const templates = new Set(items.map((i) => i.template))
     expect(templates.has('type-word-transcription')).toBe(true)
@@ -29,13 +29,22 @@ describe('TYPING generation (BR-50)', () => {
     expect(templates.has('type-meaning-word')).toBe(false)
   })
 
-  it('filters by word-mode: answered field is always the word', () => {
+  it('filters by multiple options: answered field is always the word', () => {
     const words = freshWords()
-    const items = typing.generate(words, { rng: createRng(100), mode: 'word' })
+    const items = typing.generate(words, {
+      rng: createRng(100),
+      options: ['type-transcription-word', 'type-meaning-word'],
+    })
     const templates = new Set(items.map((i) => i.template))
     expect(templates.has('type-transcription-word')).toBe(true)
     expect(templates.has('type-meaning-word')).toBe(true)
     expect(templates.has('type-word-transcription')).toBe(false)
+  })
+
+  it('empty options → all templates (back-compat default)', () => {
+    const words = freshWords()
+    const items = typing.generate(words, { rng: createRng(101), options: [] })
+    expect(items.length).toBe(words.length * 3)
   })
 
   it('skips templates whose key or target is blank (AMB-8)', () => {

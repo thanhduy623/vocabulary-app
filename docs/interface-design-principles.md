@@ -476,7 +476,8 @@ randomly and mastery-debt must be repaid (see engine `requiredCorrect`).
 | Home (`/`) | `h3` count + primary "Thêm" | Grid of `CollectionCard` (`col-12 col-sm-6 col-lg-4`) | — (card actions) | A: page |
 | Word Management | `h3` collection name + counts + "Thêm từ" | `FilterBar` + `table-responsive` table | — (row actions) | A: page |
 | Word Selection | Title + "Đã chọn" badge + collection meta | `FilterBar` + `list-group` checkbox rows | `.sticky-action-bar`: count + **Tiếp →** | A: page |
-| Skill Selection | Title + "Đã chọn: N" badge | Skill card grid (`col-lg-3`), **single-select** | `.sticky-action-bar`: **Quay lại** + **Bắt đầu học →** | A: page |
+| Skill Selection | Title + "Đã chọn: N" badge | Skill card grid (`col-lg-3`), **single-select** | Header **Tiếp →** → Skill Options | A: page |
+| Skill Options (`/learn/select-options`) | Title + "N kỹ năng" badge | Stacked reusable `SkillOptionsPicker` (`min(640px,100%)`) — toggle rows with ✓ marks | **Bắt đầu học →** primary action inside each picker header (disabled until ≥1 option) | A: page |
 | Learning (`/learn/:skillId`) | Skill label + completion badge | `learning-shell` → `learning-stage` → skill game (centered per §5.3) | — (in-stage controls) | **B: contained** |
 | Not Found | — | 404 + **Về trang chủ** | — | A: page |
 

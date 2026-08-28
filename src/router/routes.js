@@ -6,6 +6,7 @@ export const ROUTE_NAMES = {
   wordManagement: 'word-management',
   wordSelection: 'word-selection',
   skillSelection: 'skill-selection',
+  skillOptions: 'skill-options',
   learning: 'learning',
   notFound: 'not-found',
 }
@@ -34,6 +35,17 @@ export const routes = [
     name: ROUTE_NAMES.skillSelection,
     component: () => import('@/views/SkillSelectionView.vue'),
     meta: { title: 'Select Skills', requiresCollection: true, requiresWords: true },
+  },
+  {
+    path: '/learn/select-options',
+    name: ROUTE_NAMES.skillOptions,
+    component: () => import('@/views/SkillOptionsView.vue'),
+    meta: {
+      title: 'Skill Options',
+      requiresCollection: true,
+      requiresWords: true,
+      requiresSkills: true,
+    },
   },
   {
     path: '/learn/:skillId',

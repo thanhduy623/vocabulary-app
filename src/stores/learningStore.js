@@ -137,10 +137,12 @@ export const useLearningStore = defineStore('learning', {
 
     /**
      * Start a learning session from the current selection (FR-L05/BR-35).
-     * Snapshots words from cache, builds the engine session, activates the
-     * first selected skill.
+     * Snapshots words from cache, builds the engine session with the chosen
+     * per-skill option mixes, activates the first selected skill.
+     * @param {Object} [skillOptions]  { [skillId]: string[] } selected option
+     *                                 ids per skill (Skill Options step)
      */
-    startSession() {
+    startSession(skillOptions = {}) {
       if (!this.canStart) {
         return { ok: false, error: 'Chưa đủ điều kiện bắt đầu phiên học' }
       }
@@ -162,6 +164,7 @@ export const useLearningStore = defineStore('learning', {
           words,
           skillIds: [...this.selectedSkillIds],
           lang: collection?.symbol ?? '',
+          skillOptions,
         })
         this.learningSession = session
         this.activeSkillId = firstSkillId
@@ -189,24 +192,6 @@ export const useLearningStore = defineStore('learning', {
       }
       engine.beginSkill(this.learningSession, skillId)
       this.activeSkillId = skillId
-      return true
-    },
-
-    /**
-     * Start the TYPING skill with a chosen practice mode. The mode decides the
-     * question direction (what the learner types): 'word' or 'transcription'.
-     * The TYPING plan is regenerated for that mode (fresh shuffle, zeroed
-     * counters) and becomes active immediately.
-     * @param {'word'|'transcription'} mode
-     */
-    startTypingMode(mode) {
-      if (!this.learningSession) return false
-      if (!this.learningSession.selectedSkillOrder.includes(engine.SKILL_IDS.TYPING)) {
-        return false
-      }
-      engine.resetSkill(this.learningSession, engine.SKILL_IDS.TYPING, { mode })
-      engine.beginSkill(this.learningSession, engine.SKILL_IDS.TYPING)
-      this.activeSkillId = engine.SKILL_IDS.TYPING
       return true
     },
 
