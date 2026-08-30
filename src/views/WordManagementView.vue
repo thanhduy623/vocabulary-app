@@ -2,7 +2,7 @@
 // Word Management screen (FR-W01..W09): list, search, filter, sort, CRUD.
 // All search/filter/sort are client-side (BR-27); data flows cache-first.
 
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWordsStore } from '@/stores/wordsStore'
 import { useCollectionsStore } from '@/stores/collectionsStore'
@@ -13,6 +13,12 @@ import FilterBar from '@/components/words/FilterBar.vue'
 import WordRow from '@/components/words/WordRow.vue'
 import WordFormModal from '@/components/words/WordFormModal.vue'
 import AppSpinner from '@/components/common/AppSpinner.vue'
+
+// Lazy-loaded: wraps the SheetJS dependency (≈230 kB) in a separate chunk
+// that is fetched only when the user first opens the bulk-import modal.
+const BulkImportModal = defineAsyncComponent(
+  () => import('@/components/words/BulkImportModal.vue'),
+)
 
 const route = useRoute()
 const wordsStore = useWordsStore()
@@ -28,6 +34,8 @@ const filters = ref({ search: '', type: '', topic: '', level: '' })
 
 /** Modal state: null | { type:'create' } | { type:'edit', id } */
 const modalState = ref(null)
+/** Bulk import modal (Excel template upload). */
+const bulkOpen = ref(false)
 const modalErrors = ref({})
 const busy = ref(false)
 
@@ -82,6 +90,14 @@ async function loadWords() {
 function openCreate() {
   modalErrors.value = {}
   modalState.value = { type: 'create' }
+}
+
+function openBulk() {
+  bulkOpen.value = true
+}
+
+function closeBulk() {
+  bulkOpen.value = false
 }
 
 function openEdit(id) {
@@ -165,7 +181,10 @@ async function requestDelete(id) {
           {{ words.length }} từ vựng · hiển thị {{ visibleWords.length }}
         </p>
       </div>
-      <div class="d-grid d-sm-block">
+      <div class="d-grid gap-2 d-sm-flex justify-content-sm-end">
+        <button type="button" class="btn btn-outline-primary" @click="openBulk">
+          Nhập hàng loạt
+        </button>
         <button type="button" class="btn btn-primary" @click="openCreate">
           + Thêm từ vựng
         </button>
@@ -240,6 +259,13 @@ async function requestDelete(id) {
       @submit="handleSubmit"
       @close="closeModal"
       @clear-error="clearFieldError"
+    />
+
+    <!-- Bulk import modal -->
+    <BulkImportModal
+      :visible="bulkOpen"
+      :default-collection-id="collectionId"
+      @close="closeBulk"
     />
   </section>
 </template>

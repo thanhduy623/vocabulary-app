@@ -113,6 +113,20 @@ export const useWordsStore = defineStore('words', {
     },
 
     /**
+     * Create a word without auto-toasts (bulk-import path, FR-W05).
+     * Identical to createWord (same validation + cache update) but does not
+     * push a danger toast per `_` error — the bulk import modal summarizes
+     * failures itself instead of spamming one toast per word.
+     * @param {Object} input
+     * @returns {Promise<{ok: true, word: Object}|{ok: false, errors: Object}>}
+     */
+    async createWordQuiet(input) {
+      const res = await wordsService.createWord(input)
+      if (res.ok) this.addWord(res.word)
+      return res
+    },
+
+    /**
      * Update a word (FR-W06, BR-22). Applies cache-move (BR-23) when the
      * collection changed. Cache updated only after Firebase succeeds.
      * @param {string} id

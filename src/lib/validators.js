@@ -31,7 +31,7 @@ const COLLECTION_RULES = {
 }
 
 /** @type {{ required: string[], maxLengths: Object<string, number> }} */
-const WORD_RULES = {
+export const WORD_RULES = {
   required: ['collectionId', 'word', 'meaning'],
   maxLengths: {
     word: 200,
