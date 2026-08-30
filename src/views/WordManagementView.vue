@@ -12,7 +12,9 @@ import { sortByLocale } from '@/lib/text'
 import FilterBar from '@/components/words/FilterBar.vue'
 import WordRow from '@/components/words/WordRow.vue'
 import WordFormModal from '@/components/words/WordFormModal.vue'
+import BatchEditModal from '@/components/words/BatchEditModal.vue'
 import AppSpinner from '@/components/common/AppSpinner.vue'
+import { buildBatchInput } from '@/services/batchEdit.service'
 
 // Lazy-loaded: wraps the SheetJS dependency (≈230 kB) in a separate chunk
 // that is fetched only when the user first opens the bulk-import modal.
@@ -36,6 +38,13 @@ const filters = ref({ search: '', type: '', topic: '', level: '' })
 const modalState = ref(null)
 /** Bulk import modal (Excel template upload). */
 const bulkOpen = ref(false)
+/** Batch edit modal (multi-select → edit collection/type/topic/level). */
+const batchOpen = ref(false)
+const batchBusy = ref(false)
+/** Snapshot (copies) of the words the batch edit is applied to. */
+const batchSnapshot = ref([])
+/** Page-local row selection for batch operations (separate from study selection). */
+const selectedIds = ref([])
 const modalErrors = ref({})
 const busy = ref(false)
 
@@ -70,6 +79,17 @@ const visibleWords = computed(() => {
   return sortByLocale(filtered, (w) => w.word)
 })
 
+/** Selected words that still exist in the cached list (for the count). */
+const selectedWords = computed(() =>
+  words.value.filter((w) => selectedIds.value.includes(w.id)),
+)
+/** Master checkbox reflects the VISIBLE set; select-all acts on visible words. */
+const allVisibleSelected = computed(
+  () =>
+    visibleWords.value.length > 0 &&
+    visibleWords.value.every((w) => selectedIds.value.includes(w.id)),
+)
+
 onMounted(async () => {
   // Deep-link support: sync store selection from the route param.
   const param = String(route.params.collectionId ?? '')
@@ -98,6 +118,79 @@ function openBulk() {
 
 function closeBulk() {
   bulkOpen.value = false
+}
+
+// --- batch selection helpers ------------------------------------------------
+
+function isSelected(id) {
+  return selectedIds.value.includes(id)
+}
+
+function toggleSelect(id) {
+  const idx = selectedIds.value.indexOf(id)
+  if (idx >= 0) selectedIds.value.splice(idx, 1)
+  else selectedIds.value.push(id)
+}
+
+/** Select/deselect the visible (filtered) words from the master checkbox. */
+function toggleSelectAllVisible() {
+  const visibleIds = visibleWords.value.map((w) => w.id)
+  const allSelected =
+    visibleIds.length > 0 &&
+    visibleIds.every((id) => selectedIds.value.includes(id))
+  selectedIds.value = allSelected
+    ? selectedIds.value.filter((id) => !visibleIds.includes(id))
+    : [...new Set([...selectedIds.value, ...visibleIds])]
+}
+
+function clearSelection() {
+  selectedIds.value = []
+}
+
+function openBatchEdit() {
+  if (selectedIds.value.length === 0 || busy.value || batchBusy.value) return
+  // Stable snapshot: cache updates during the batch loop must not shift the
+  // targets that were selected when the user opened the modal.
+  batchSnapshot.value = selectedWords.value.map((w) => ({ ...w }))
+  batchOpen.value = true
+}
+
+function closeBatchEdit() {
+  if (batchBusy.value) return
+  batchOpen.value = false
+  batchSnapshot.value = []
+}
+
+async function handleBatchSubmit(batch) {
+  if (batchSnapshot.value.length === 0 || batchBusy.value) return
+
+  batchBusy.value = true
+  try {
+    const updates = batchSnapshot.value.map((w) => ({
+      id: w.id,
+      input: buildBatchInput(w, batch),
+    }))
+    const result = await wordsStore.updateWordsQuiet(updates)
+
+    const successful = result.results.filter((r) => r.ok).length
+    const failedCount = result.results.length - successful
+    if (successful > 0) {
+      uiStore.pushToast('success', `Đã cập nhật ${successful} từ vựng.`)
+    }
+    if (failedCount > 0) {
+      uiStore.pushToast(
+        'warning',
+        `${failedCount} từ vựng cập nhật thất bại — hãy sửa thủ công từng từ.`,
+        { duration: 5000 },
+      )
+    }
+
+    clearSelection()
+    batchOpen.value = false
+    batchSnapshot.value = []
+  } finally {
+    batchBusy.value = false
+  }
 }
 
 function openEdit(id) {
@@ -161,7 +254,11 @@ async function requestDelete(id) {
   busy.value = true
   try {
     const deleted = await wordsStore.deleteWord(collectionId.value, id)
-    if (deleted) uiStore.pushToast('success', 'Đã xóa từ vựng')
+    if (deleted) {
+      // A deleted word can no longer be part of the batch selection.
+      selectedIds.value = selectedIds.value.filter((sid) => sid !== id)
+      uiStore.pushToast('success', 'Đã xóa từ vựng')
+    }
   } finally {
     busy.value = false
   }
@@ -219,6 +316,36 @@ async function requestDelete(id) {
     <template v-else>
       <FilterBar v-model="filters" :options="filterOptions" />
 
+      <!-- Batch selection toolbar (appears once at least one word is selected) -->
+      <div
+        v-if="selectedIds.length > 0"
+        class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 batch-toolbar"
+        role="toolbar"
+        aria-label="Công cụ chỉnh sửa hàng loạt"
+      >
+        <span class="small text-muted">
+          Đã chọn <strong>{{ selectedWords.length }}</strong> từ
+        </span>
+        <div class="d-flex gap-2">
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            :disabled="busy || batchBusy"
+            @click="clearSelection"
+          >
+            Bỏ chọn
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline-primary"
+            :disabled="busy || batchBusy || selectedWords.length === 0"
+            @click="openBatchEdit"
+          >
+            Chỉnh sửa hàng loạt
+          </button>
+        </div>
+      </div>
+
       <div v-if="visibleWords.length === 0" class="text-center text-muted py-4">
         <p class="mb-0">Không có từ vựng nào khớp bộ lọc.</p>
       </div>
@@ -227,6 +354,16 @@ async function requestDelete(id) {
         <table class="table table-hover align-middle mb-0">
           <thead class="table-light">
             <tr>
+              <th scope="col" class="text-center" style="width: 3rem">
+                <input
+                  type="checkbox"
+                  class="form-check-input m-0 select-checkbox"
+                  :checked="allVisibleSelected"
+                  :disabled="visibleWords.length === 0"
+                  aria-label="Chọn tất cả từ đang hiển thị"
+                  @change="toggleSelectAllVisible"
+                />
+              </th>
               <th scope="col">Từ</th>
               <th scope="col">Phiên âm</th>
               <th scope="col">Nghĩa</th>
@@ -239,7 +376,9 @@ async function requestDelete(id) {
               v-for="word in visibleWords"
               :key="word.id"
               :word="word"
+              :selected="isSelected(word.id)"
               :busy="busy"
+              @toggle="toggleSelect"
               @edit="openEdit"
               @delete="requestDelete"
             />
@@ -267,6 +406,17 @@ async function requestDelete(id) {
       :default-collection-id="collectionId"
       @close="closeBulk"
     />
+
+    <!-- Batch edit modal -->
+    <BatchEditModal
+      :visible="batchOpen"
+      :selected-words="batchSnapshot"
+      :options="filterOptions"
+      :default-collection-id="collectionId"
+      :busy="batchBusy"
+      @submit="handleBatchSubmit"
+      @close="closeBatchEdit"
+    />
   </section>
 </template>
 
@@ -292,5 +442,20 @@ async function requestDelete(id) {
 /* Shrinkable flex children need min-width: 0 for truncation (§3.2). */
 .min-width-0 {
   min-width: 0;
+}
+
+/* Batch selection toolbar — same surface as the list panel. */
+.batch-toolbar {
+  background-color: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 0.9rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  padding: 0.75rem 1rem;
+}
+
+/* Larger checkbox for the master "select all" header (§10). */
+.select-checkbox {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 </style>

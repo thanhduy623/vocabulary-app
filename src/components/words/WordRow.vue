@@ -8,17 +8,31 @@ defineProps({
     type: Object,
     required: true,
   },
+  selected: {
+    type: Boolean,
+    default: false,
+  },
   busy: {
     type: Boolean,
     default: false,
   },
 })
 
-defineEmits(['edit', 'delete'])
+defineEmits(['edit', 'delete', 'toggle'])
 </script>
 
 <template>
   <tr class="word-row">
+    <td class="word-check">
+      <input
+        type="checkbox"
+        class="form-check-input m-0 select-checkbox"
+        :checked="selected"
+        :disabled="busy"
+        :aria-label="`Chọn từ ${word.word}`"
+        @change="$emit('toggle', word.id)"
+      />
+    </td>
     <td class="fw-semibold">{{ word.word }}</td>
     <td class="text-muted word-transcription">{{ word.transcription }}</td>
     <td class="word-meaning">{{ word.meaning }}</td>
@@ -119,5 +133,11 @@ defineEmits(['edit', 'delete'])
 .word-icon {
   width: 1.05em;
   height: 1.05em;
+}
+
+/* Larger checkbox = easier touch target inside the row (§10). */
+.select-checkbox {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 </style>

@@ -151,6 +151,55 @@ export const useWordsStore = defineStore('words', {
     },
 
     /**
+     * Batch-update multiple words without auto-toasts (batch-edit path, FR-W06).
+     * Updates each word sequentially so the cache stays consistent after every
+     * successful Firebase write; failures are collected (not toasted per word)
+     * so the UI can summarize them. Afterwards, stale study selections are
+     * pruned: any selected word that no longer lives in the currently selected
+     * study collection (e.g. after batch move) is removed (mirrors deleteWord).
+     * @param {{id: string, input: Object}[]} updates
+     * @returns {Promise<{ok: boolean, results: {id: string, ok: boolean, word?: Object, error?: string}[]}>}
+     */
+    async updateWordsQuiet(updates) {
+      const results = []
+
+      for (const { id, input } of updates) {
+        const prev = this.findWordById(id)
+        if (!prev) {
+          results.push({ id, ok: false, error: 'Word not found' })
+          continue
+        }
+        const res = await wordsService.updateWord(id, input)
+        if (!res.ok) {
+          results.push({
+            id,
+            ok: false,
+            error: Object.values(res.errors || {}).join(' · ') || 'Update failed',
+          })
+          continue
+        }
+        const next = { ...res.word, id, createdAt: prev.createdAt }
+        this.applyWordCacheUpdate(next, prev)
+        results.push({ id, ok: true, word: next })
+      }
+
+      // Study selections must resolve to words inside the study collection.
+      const learningStore = useLearningStore()
+      const studyCollectionId = learningStore.selectedCollectionId
+      if (studyCollectionId) {
+        const valid = learningStore.selectedWordIds.filter((wid) => {
+          const w = this.findWordById(wid)
+          return w && w.collectionId === studyCollectionId
+        })
+        if (valid.length !== learningStore.selectedWordIds.length) {
+          learningStore.setSelectedWordIds(valid)
+        }
+      }
+
+      return { ok: results.every((r) => r.ok), results }
+    },
+
+    /**
      * Delete a word (FR-W07). Cache updated only after Firebase succeeds.
      * @param {string} collectionId  current bucket of the word
      * @param {string} id
