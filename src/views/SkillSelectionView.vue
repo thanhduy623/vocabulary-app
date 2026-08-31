@@ -1,11 +1,12 @@
 <script setup>
 // Skill Selection screen (FR-L04, BR-33, req §16/§18).
 //
-// Fresh multi-select picker every time it's shown. Leaving Learning (exit or
-// completion) clears the whole session progression (learningStore
-// .clearLearningSession), so the cards never show stale progress or lock the
-// learner into the previous selection — any skill can be (re)chosen freely.
-// The collection + chosen words are preserved so starting again is one tap.
+// Single-select picker: picking ONE skill card stores just that skill and
+// advances straight to its options step (no Next button — proceeds on tap).
+// Leaving Learning (exit or completion) clears the whole session progression
+// (learningStore.clearLearningSession), so the cards are a fresh picker every
+// time — any skill can be (re)chosen freely. The collection + chosen words are
+// preserved so starting again is one tap.
 
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import { ROUTE_NAMES } from '@/router/routes'
@@ -22,14 +23,10 @@ function isSelected(skillId) {
   return store.selectedSkillIds.includes(skillId)
 }
 
-/** Single-select: picking a card selects it alone; picking it again clears it. */
-function toggleSkill(skillId) {
-  if (isSelected(skillId)) store.setSelectedSkillIds([])
-  else store.setSelectedSkillIds([skillId])
-}
-
-/** Skills picked → proceed to the per-skill options step (new workflow). */
-function proceedToOptions() {
+/** Single-select + auto-advance: picking a card stores ONLY that skill and
+ *  proceeds to its per-skill options step (the Next button is gone). */
+function selectSkill(skillId) {
+  store.setSelectedSkillIds([skillId])
   router.push({ name: ROUTE_NAMES.skillOptions })
 }
 
@@ -56,19 +53,9 @@ onBeforeRouteLeave((to) => {
   <section class="skill-selection-view">
     <!-- Page header (§12): title left, selection badge right — same anatomy
          as Word Selection for flow consistency. -->
-    <header
-      class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-sm-between gap-2 mb-4"
-    >
+    <header class="mb-4">
       <h1 class="h3 mb-0">Chọn chế độ học</h1>
-      <button
-          type="button"
-          class="btn btn-primary d-inline-flex align-items-center gap-2"
-          :disabled="!store.canStart"
-          @click="proceedToOptions"
-        >
-          Tiếp
-          <span aria-hidden="true">&rarr;</span>
-        </button>
+      <p class="small text-muted mb-0 mt-1">Chọn 1 chế độ để tiếp tục.</p>
     </header>
 
     <div class="row g-3 g-lg-4">
@@ -82,7 +69,7 @@ onBeforeRouteLeave((to) => {
           class="card h-100 w-100 text-start p-0 skill-card position-relative"
           :class="{ 'is-selected': isSelected(skill.id) }"
           :aria-pressed="isSelected(skill.id)"
-          @click="toggleSkill(skill.id)"
+          @click="selectSkill(skill.id)"
         >
           <div class="card-body d-flex flex-column gap-2">
             <div class="d-flex align-items-start justify-content-between gap-2">

@@ -498,14 +498,11 @@ Không GET lại DB nếu dữ liệu trong cache đã có thể xác định ch
     LISTENING
     TYPING
     Mỗi skill hiển thị dưới dạng Card.
-    User có thể chọn:
-    1 skill
-    2 skills
-    3 skills
-    4 skills
-    Không giới hạn tối đa ngoài số skill hiện có.
+    User chỉ có thể chọn đúng 1 skill (single-select).
+    Khi chọn một skill, hệ thống chuyển thẳng sang trang
+    TÙY CHỌN CHẾ ĐỘ HỌC — không còn nút Tiếp.
     Điều kiện:
-    selectedSkillIds.length >= 1
+    selectedSkillIds.length === 1
 16. LƯU CHẾ ĐỘ HỌC
     Khi user chọn skill:
     selectedSkillIds

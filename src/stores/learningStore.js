@@ -116,12 +116,6 @@ export const useLearningStore = defineStore('learning', {
       this.selectedWordIds = allSelected ? [] : ids
     },
 
-    toggleSkill(id) {
-      const idx = this.selectedSkillIds.indexOf(id)
-      if (idx >= 0) this.selectedSkillIds.splice(idx, 1)
-      else this.selectedSkillIds.push(id)
-    },
-
     /** Single-selection helper: only one skill is studied per session. */
     setSelectedSkillIds(ids) {
       this.selectedSkillIds = [...ids].slice(0, 1)
